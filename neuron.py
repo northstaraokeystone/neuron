@@ -1,8 +1,8 @@
 """
-NEURON v4.2: Distributed Scale Ledger
-volatile state + persistent proof = resilient inference
-Sharded ledger, recovery curves, swarm-tested.
-~280 lines. Multi-model. Inference-native.
+NEURON v4.3: The Shared Nerve
+Shared hippocampus of the triad: AgentProof + AXIOM + NEURON.
+Multi-project append, system-wide α, universal pruning.
+~360 lines. Triad-native. Bio-silicon continuity.
 """
 
 import hashlib
@@ -32,8 +32,52 @@ LEDGER_PATH = _get_ledger_path()
 ARCHIVE_PATH = _get_archive_path()
 
 # Projects and Models
-ALLOWED_PROJECTS = ["agentproof", "axiom", "neuron"]
+ALLOWED_PROJECTS = ["agentproof", "axiom", "neuron", "grok", "human"]
 SUPPORTED_MODELS = ["grok", "claude", "gemini", "neuron"]
+
+# ============================================
+# v4.3 SHARED NERVE CONSTANTS
+# ============================================
+LEDGER_SHARED_MODE = True
+ALPHA_SYSTEM_WIDE = True
+PRUNING_UNIVERSAL_SALIENCE = True
+
+# AI Event Types (auto-append triggers)
+AI_EVENT_TYPES = {
+    "task": "Regular task entry",
+    "grok_eviction": "Grok context window truncated oldest entries",
+    "grok_reset": "Grok conversation reset (cold start)",
+    "agentproof_rollback": "AgentProof anomaly containment triggered",
+    "agentproof_anchor": "AgentProof blockchain anchor committed",
+    "axiom_law_discovery": "AXIOM KAN witnessed new coordination law",
+    "axiom_entropy_spike": "AXIOM swarm entropy exceeded threshold",
+    "human_interrupt": "Human task switch or interruption",
+    "human_return": "Human returned from gap",
+    "eviction": "Context eviction event",
+    "rollback": "Rollback/recovery event",
+    "discovery": "Discovery/learning event",
+    "interrupt": "Interruption event",
+    "unknown": "Unknown event type"
+}
+
+# System-wide Alpha Parameters
+SYSTEM_TAU_DEFAULT = 120.0  # Minutes (Monsell 2003, applies to all)
+SYSTEM_GAP_WEIGHT = {
+    "human": 1.0,      # Baseline
+    "grok": 0.8,       # AI recovers faster
+    "agentproof": 0.6, # Deterministic recovery
+    "axiom": 0.7,      # Swarm coordination overhead
+    "neuron": 0.5      # Self-recovery fastest
+}
+
+# Universal Pruning Weights
+PROJECT_PRUNE_WEIGHT = {
+    "human": 1.0,      # Preserve human entries slightly more
+    "agentproof": 0.9, # Slightly more aggressive on AP
+    "axiom": 0.9,      # Slightly more aggressive on AXIOM
+    "grok": 0.85,      # Most aggressive on Grok (ephemeral by nature)
+    "neuron": 1.0      # Self-entries preserved
+}
 
 # Entry constraints
 MAX_TASK_LEN = 50
@@ -291,27 +335,165 @@ def recovery_cost(gap_minutes: float, tau: float = DEFAULT_RECOVERY_TAU,
 
 
 def append(project: str, task: str, next_action: str, commit: str | None = None, energy: float | None = None,
-           model: str = "neuron", token_count: int = 0, inference_id: str | None = None, context_summary: str = "") -> dict:
-    """Append entry to shared ledger with salience/energy and optional inference metadata."""
+           model: str = "neuron", token_count: int = 0, inference_id: str | None = None, context_summary: str = "",
+           event_type: str = "task", salience: float = 1.0, source_context: dict | None = None) -> dict:
+    """Append entry to shared ledger with salience/energy and optional inference metadata.
+
+    v4.3 Extended: Supports multi-project append with event_type and source_context.
+
+    Args:
+        project: Source project identifier (human, agentproof, axiom, grok, neuron)
+        task: Task description
+        next_action: Next action description
+        commit: Git commit hash (optional)
+        energy: Cognitive load estimate (optional, computed if not provided)
+        model: LLM model identifier
+        token_count: Context window utilization
+        inference_id: Unique inference cycle ID
+        context_summary: Compressed context snapshot
+        event_type: Type of event (task, eviction, rollback, discovery, interrupt, etc.)
+        salience: Initial importance (0-1)
+        source_context: Optional metadata from source project
+
+    Returns:
+        Complete entry dict with hash
+    """
     if project not in ALLOWED_PROJECTS:
-        raise ValueError(f"Project must be one of: {ALLOWED_PROJECTS}")
+        raise StopRule("invalid_project", f"Project must be one of: {ALLOWED_PROJECTS}", {"project": project})
     if model not in SUPPORTED_MODELS:
         raise ValueError(f"Model must be one of: {SUPPORTED_MODELS}")
+
+    # Validate event_type, warn but allow unknown
+    if event_type not in AI_EVENT_TYPES:
+        event_type = "unknown"
+
     task, next_action = task[:MAX_TASK_LEN], next_action[:MAX_NEXT_LEN]
     context_summary = context_summary[:MAX_CONTEXT_SUMMARY_LEN]
+
     entry = {
         "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "project": project, "model": model, "commit": commit, "task": task, "next": next_action,
-        "salience": 1.0, "replay_count": 0,
+        "project": project,
+        "event_type": event_type,  # v4.3 NEW
+        "model": model,
+        "commit": commit,
+        "task": task,
+        "next": next_action,
+        "salience": max(0.0, min(1.0, salience)),
+        "replay_count": 0,
         "energy": energy if energy else energy_estimate(task, next_action, token_count),
-        "token_count": token_count, "inference_id": inference_id, "context_summary": context_summary
+        "token_count": token_count,
+        "inference_id": inference_id,
+        "context_summary": context_summary,
+        "source_context": source_context or {}  # v4.3 NEW
     }
     entry["hash"] = dual_hash(json.dumps({k: v for k, v in entry.items() if k != "hash"}, sort_keys=True))
     ledger_path = _get_ledger_path()
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     with open(ledger_path, "a") as f:
         f.write(json.dumps(entry) + "\n")
+
+    # Emit shared_ledger_append_receipt for v4.3
+    if LEDGER_SHARED_MODE:
+        ledger = _read_ledger()
+        projects_active = list(set(e.get("project", "neuron") for e in ledger))
+        emit_receipt("shared_ledger_append", {
+            "tenant_id": "neuron",
+            "entry_id": entry.get("hash", "")[:32],
+            "project": project,
+            "event_type": event_type,
+            "ledger_size": len(ledger),
+            "projects_active": projects_active
+        })
+
     return entry
+
+
+def append_from_agentproof(event: str, context: dict) -> dict:
+    """Wrapper for AgentProof events. Sets project='agentproof'.
+
+    Args:
+        event: Event type (rollback, anchor, etc.)
+        context: Metadata from AgentProof (tx_hash, anomaly_type, etc.)
+
+    Returns:
+        Entry dict
+    """
+    event_type_map = {
+        "rollback": "agentproof_rollback",
+        "anchor": "agentproof_anchor",
+    }
+    event_type = event_type_map.get(event, "rollback")
+    task = f"AgentProof {event}: {context.get('tx_hash', 'unknown')[:20]}"
+
+    return append(
+        project="agentproof",
+        task=task[:MAX_TASK_LEN],
+        next_action="verify_chain_state",
+        event_type=event_type,
+        salience=0.7,
+        source_context={**context, "trigger": "auto"}
+    )
+
+
+def append_from_axiom(event: str, context: dict) -> dict:
+    """Wrapper for AXIOM events. Sets project='axiom'.
+
+    Args:
+        event: Event type (law_discovery, entropy_spike, etc.)
+        context: Metadata from AXIOM (law, compression, entropy, etc.)
+
+    Returns:
+        Entry dict
+    """
+    event_type_map = {
+        "law_discovery": "axiom_law_discovery",
+        "entropy_spike": "axiom_entropy_spike",
+    }
+    event_type = event_type_map.get(event, "discovery")
+    law = context.get("law", "unknown")
+    task = f"AXIOM {event}: {law[:30]}"
+
+    return append(
+        project="axiom",
+        task=task[:MAX_TASK_LEN],
+        next_action="integrate_law",
+        event_type=event_type,
+        salience=0.8,
+        source_context={**context, "trigger": "auto"}
+    )
+
+
+def append_from_grok(event: str, context: dict) -> dict:
+    """Wrapper for Grok events. Sets project='grok'.
+
+    Args:
+        event: Event type (eviction, reset, etc.)
+        context: Metadata from Grok (tokens_evicted, reason, etc.)
+
+    Returns:
+        Entry dict
+    """
+    event_type_map = {
+        "eviction": "grok_eviction",
+        "reset": "grok_reset",
+    }
+    event_type = event_type_map.get(event, "eviction")
+    tokens = context.get("tokens_evicted", 0)
+    task = f"Grok {event}: {tokens} tokens"
+
+    return append(
+        project="grok",
+        task=task[:MAX_TASK_LEN],
+        next_action="restore_context",
+        event_type=event_type,
+        salience=0.6,
+        source_context={**context, "trigger": "auto"}
+    )
+
+
+def load_ledger() -> list:
+    """Load the full ledger (alias for _read_ledger for public API)."""
+    return _read_ledger()
 
 
 def inference_append(model: str, task: str, next_action: str, context_summary: str,
@@ -500,6 +682,217 @@ def alpha(threshold_minutes: int = DEFAULT_GAP_THRESHOLD_MIN, tau: float = DEFAU
             "tau_used": tau, "curve_model": curve_model}
 
 
+# ============================================
+# v4.3 SYSTEM-WIDE ALPHA (Gate 2)
+# ============================================
+
+def detect_system_gaps(ledger: list | None = None, threshold_minutes: int = 1) -> list:
+    """Identify gaps between ANY consecutive entries regardless of project.
+
+    v4.3: Gaps are system-wide entropy events, not human interruptions.
+
+    Args:
+        ledger: Full shared ledger (loads if None)
+        threshold_minutes: Minimum gap to consider (default 1 minute)
+
+    Returns:
+        List of {start, end, gap_minutes, from_project, to_project}
+    """
+    if ledger is None:
+        ledger = _read_ledger()
+
+    if len(ledger) < 2:
+        return []
+
+    # Sort by timestamp
+    sorted_entries = sorted(ledger, key=lambda e: e.get("ts", ""))
+    gaps = []
+    threshold_seconds = threshold_minutes * 60
+
+    for i in range(1, len(sorted_entries)):
+        prev_entry = sorted_entries[i - 1]
+        curr_entry = sorted_entries[i]
+
+        prev_ts = datetime.fromisoformat(prev_entry["ts"].replace("Z", "+00:00"))
+        curr_ts = datetime.fromisoformat(curr_entry["ts"].replace("Z", "+00:00"))
+        gap_seconds = (curr_ts - prev_ts).total_seconds()
+
+        if gap_seconds > threshold_seconds:
+            gaps.append({
+                "start": prev_entry["ts"],
+                "end": curr_entry["ts"],
+                "gap_minutes": round(gap_seconds / 60, 2),
+                "from_project": prev_entry.get("project", "neuron"),
+                "to_project": curr_entry.get("project", "neuron")
+            })
+
+    return gaps
+
+
+def weighted_gap(gap_minutes: float, from_project: str, to_project: str) -> float:
+    """Apply SYSTEM_GAP_WEIGHT to a gap based on projects.
+
+    v4.3: Cross-project gaps weighted by project recovery characteristics.
+
+    Args:
+        gap_minutes: Duration of the gap in minutes
+        from_project: Project that created entry before gap
+        to_project: Project that created entry after gap
+
+    Returns:
+        Weighted gap value
+    """
+    from_weight = SYSTEM_GAP_WEIGHT.get(from_project, 1.0)
+    to_weight = SYSTEM_GAP_WEIGHT.get(to_project, 1.0)
+    return gap_minutes * from_weight * to_weight
+
+
+def alpha_system_wide(ledger: list | None = None, tau: float = SYSTEM_TAU_DEFAULT,
+                      threshold_minutes: int = 1) -> float:
+    """Calculate α across ALL gaps weighted by project.
+
+    v4.3: "α is calculated across human + AI recovery time."
+
+    Args:
+        ledger: Full shared ledger (loads if None)
+        tau: Recovery time constant (default 120.0)
+        threshold_minutes: Minimum gap to consider
+
+    Returns:
+        System-wide alpha value (mean of weighted gaps normalized by tau)
+    """
+    gaps = detect_system_gaps(ledger, threshold_minutes)
+
+    if not gaps:
+        return 0.0
+
+    weighted_values = []
+    for gap in gaps:
+        wg = weighted_gap(gap["gap_minutes"], gap["from_project"], gap["to_project"])
+        # Normalize by tau for recovery cost integration
+        weighted_values.append(wg / tau)
+
+    return sum(weighted_values) / len(weighted_values)
+
+
+def alpha_by_project(ledger: list | None = None, tau: float = SYSTEM_TAU_DEFAULT) -> dict:
+    """Returns per-project α breakdown.
+
+    v4.3: Useful for debugging and understanding project-specific recovery patterns.
+
+    Args:
+        ledger: Full shared ledger (loads if None)
+        tau: Recovery time constant
+
+    Returns:
+        Dict of {project: α_value}
+    """
+    if ledger is None:
+        ledger = _read_ledger()
+
+    # Group entries by project
+    project_entries = {}
+    for entry in ledger:
+        proj = entry.get("project", "neuron")
+        if proj not in project_entries:
+            project_entries[proj] = []
+        project_entries[proj].append(entry)
+
+    # Calculate alpha for each project
+    result = {}
+    for proj, entries in project_entries.items():
+        if len(entries) < 2:
+            result[proj] = 0.0
+            continue
+
+        sorted_entries = sorted(entries, key=lambda e: e.get("ts", ""))
+        gap_values = []
+
+        for i in range(1, len(sorted_entries)):
+            prev_ts = datetime.fromisoformat(sorted_entries[i-1]["ts"].replace("Z", "+00:00"))
+            curr_ts = datetime.fromisoformat(sorted_entries[i]["ts"].replace("Z", "+00:00"))
+            gap_minutes = (curr_ts - prev_ts).total_seconds() / 60
+
+            if gap_minutes > 1:
+                weight = SYSTEM_GAP_WEIGHT.get(proj, 1.0)
+                gap_values.append(gap_minutes * weight / tau)
+
+        result[proj] = round(sum(gap_values) / len(gap_values), 2) if gap_values else 0.0
+
+    return result
+
+
+def emit_system_alpha_receipt(ledger: list | None = None, tau: float = SYSTEM_TAU_DEFAULT) -> dict:
+    """Emit system_alpha_receipt with full metrics.
+
+    v4.3: Comprehensive alpha analysis for the triad.
+
+    Returns:
+        Receipt dict
+    """
+    if ledger is None:
+        ledger = _read_ledger()
+
+    gaps = detect_system_gaps(ledger)
+    cross_project_gaps = [g for g in gaps if g["from_project"] != g["to_project"]]
+    alpha_system = alpha_system_wide(ledger, tau)
+    by_project = alpha_by_project(ledger, tau)
+
+    mean_gap = sum(g["gap_minutes"] for g in gaps) / len(gaps) if gaps else 0.0
+
+    return emit_receipt("system_alpha", {
+        "tenant_id": "neuron",
+        "alpha_system": round(alpha_system, 2),
+        "alpha_by_project": by_project,
+        "total_gaps": len(gaps),
+        "cross_project_gaps": len(cross_project_gaps),
+        "mean_gap_minutes": round(mean_gap, 2),
+        "tau": tau
+    })
+
+
+# ============================================
+# v4.3 UNIVERSAL PRUNING (Gate 4)
+# ============================================
+
+def universal_score(entry: dict, system_alpha: float, now: datetime | None = None,
+                    tau: float = SYSTEM_TAU_DEFAULT) -> float:
+    """Calculate universal score for pruning.
+
+    v4.3: score = salience × exp(-age/τ) × project_weight × (1 / max(system_alpha, 0.1))
+    Higher α = more aggressive pruning.
+
+    Args:
+        entry: Ledger entry
+        system_alpha: Current system-wide alpha
+        now: Current timestamp (default: now)
+        tau: Time constant for age decay
+
+    Returns:
+        Universal score (higher = keep, lower = prune)
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    entry_ts = datetime.fromisoformat(entry["ts"].replace("Z", "+00:00"))
+    age_minutes = (now - entry_ts).total_seconds() / 60
+
+    salience = entry.get("salience", 1.0)
+    project = entry.get("project", "neuron")
+    project_weight = PROJECT_PRUNE_WEIGHT.get(project, 1.0)
+
+    # Age decay
+    age_factor = math.exp(-age_minutes / (tau * 60))  # tau is in minutes, convert to match age
+
+    # Alpha factor: higher system alpha = more aggressive pruning
+    alpha_factor = 1.0 / max(system_alpha, 0.1)
+
+    # Replay boost
+    replay_boost = 1 + 0.1 * entry.get("replay_count", 0)
+
+    return salience * age_factor * project_weight * alpha_factor * replay_boost
+
+
 def consolidate(top_k: int = DEFAULT_CONSOLIDATE_TOP_K, alpha_threshold: float = DEFAULT_ALPHA_THRESHOLD) -> dict:
     """Hippocampal replay: strengthen high-α entries with token_count weighting (Wilson & McNaughton 1994)."""
     entries = _read_ledger()
@@ -521,31 +914,94 @@ def consolidate(top_k: int = DEFAULT_CONSOLIDATE_TOP_K, alpha_threshold: float =
     return {"consolidated_count": len(affected_hashes), "salience_boost": round(boost, 3), "entries_affected": affected_hashes}
 
 
-def prune(max_age_days: int = DEFAULT_MAX_AGE_DAYS, salience_threshold: float = DEFAULT_SALIENCE_THRESHOLD) -> dict:
-    """Synaptic downscaling: archive low-salience entries targeting >99.5% compression (Tononi & Cirelli 2014)."""
+def prune(max_age_days: int = DEFAULT_MAX_AGE_DAYS, salience_threshold: float = DEFAULT_SALIENCE_THRESHOLD,
+          max_entries: int | None = None, universal: bool = True, alpha_weight: bool = True,
+          tau: float = SYSTEM_TAU_DEFAULT) -> dict:
+    """Synaptic downscaling with v4.3 universal pruning support.
+
+    v4.3 Enhanced: Universal pruning across all projects using universal_score.
+    "Pruning becomes universal: Low-α entries downweighted system-wide."
+
+    Args:
+        max_age_days: Maximum age for entries (default 30)
+        salience_threshold: Minimum salience to keep (default 0.1)
+        max_entries: Hard cap on ledger size (None = no cap)
+        universal: Apply universal scoring across all projects (default True)
+        alpha_weight: Factor in system-wide alpha (default True)
+        tau: Recovery time constant for universal scoring
+
+    Returns:
+        Dict with pruning metrics including pruned_by_project breakdown
+    """
     entries = _read_ledger()
     archive_path = _get_archive_path()
     if not entries:
         return {"pruned_count": 0, "archived_to": str(archive_path), "ledger_size_before": 0,
-                "ledger_size_after": 0, "compression_ratio": 0.0}
+                "ledger_size_after": 0, "compression_ratio": 0.0, "pruned_by_project": {},
+                "strategy": "universal" if universal else "legacy"}
 
     now = datetime.now(timezone.utc)
-    keep, archive = [], []
+    system_alpha = alpha_system_wide(entries, tau) if (universal and alpha_weight) else 1.0
+
+    # Calculate scores for all entries
+    scored_entries = []
     for e in entries:
-        decayed = salience_decay(e, now)
+        if universal:
+            score = universal_score(e, system_alpha, now, tau)
+        else:
+            score = salience_decay(e, now)
+        scored_entries.append((e, score))
+
+    # Sort by score (lowest first = prune first)
+    scored_entries.sort(key=lambda x: x[1])
+
+    # Determine how many to keep
+    if max_entries and len(entries) > max_entries:
+        # Keep top max_entries by score
+        keep_count = max_entries
+    else:
+        keep_count = len(entries)
+
+    keep, archive = [], []
+    pruned_by_project = {}
+
+    for i, (e, score) in enumerate(scored_entries):
         entry_ts = datetime.fromisoformat(e["ts"].replace("Z", "+00:00"))
         age_days = (now - entry_ts).total_seconds() / 86400
+        project = e.get("project", "neuron")
 
+        # Preserve conditions (same as before)
         preserve = (
             age_days < MIN_AGE_TO_PRUNE_DAYS or
             e.get("replay_count", 0) >= MIN_REPLAY_TO_PRESERVE or
-            decayed >= SALIENCE_RETENTION_THRESHOLD
+            score >= SALIENCE_RETENTION_THRESHOLD
         )
 
-        if preserve or (age_days <= max_age_days or decayed >= salience_threshold):
+        # Check if we should keep based on max_entries
+        entries_remaining = len(scored_entries) - i
+        keep_slots_remaining = keep_count - len(keep)
+
+        if preserve or entries_remaining <= keep_slots_remaining:
             keep.append(e)
-        else:
+        elif age_days > max_age_days and score < salience_threshold:
             archive.append(e)
+            pruned_by_project[project] = pruned_by_project.get(project, 0) + 1
+        else:
+            keep.append(e)
+
+    # Final enforcement of max_entries if still over
+    if max_entries and len(keep) > max_entries:
+        # Re-sort keep by score and trim
+        keep_scored = [(e, universal_score(e, system_alpha, now, tau) if universal else salience_decay(e, now))
+                       for e in keep]
+        keep_scored.sort(key=lambda x: x[1], reverse=True)  # Highest scores first
+        final_keep = [e for e, _ in keep_scored[:max_entries]]
+        overflow = [e for e, _ in keep_scored[max_entries:]]
+        for e in overflow:
+            project = e.get("project", "neuron")
+            pruned_by_project[project] = pruned_by_project.get(project, 0) + 1
+        archive.extend(overflow)
+        keep = final_keep
 
     if archive:
         archive_path.parent.mkdir(parents=True, exist_ok=True)
@@ -556,14 +1012,31 @@ def prune(max_age_days: int = DEFAULT_MAX_AGE_DAYS, salience_threshold: float = 
     _write_ledger(keep)
     compression_ratio = len(archive) / len(entries) if entries else 0.0
 
-    return {
+    result = {
         "pruned_count": len(archive),
         "archived_to": str(archive_path),
         "ledger_size_before": len(entries),
         "ledger_size_after": len(keep),
         "compression_ratio": round(compression_ratio, 4),
-        "salience_preserved": sum(1 for e in keep if salience_decay(e, now) >= SALIENCE_RETENTION_THRESHOLD)
+        "salience_preserved": sum(1 for e in keep if salience_decay(e, now) >= SALIENCE_RETENTION_THRESHOLD),
+        "pruned_by_project": pruned_by_project,
+        "system_alpha": round(system_alpha, 2),
+        "strategy": "universal" if universal else "legacy"
     }
+
+    # Emit universal_prune_receipt for v4.3
+    if universal and PRUNING_UNIVERSAL_SALIENCE:
+        emit_receipt("universal_prune", {
+            "tenant_id": "neuron",
+            "before_count": len(entries),
+            "after_count": len(keep),
+            "pruned_by_project": pruned_by_project,
+            "system_alpha": round(system_alpha, 2),
+            "compression_ratio": round(compression_ratio, 4),
+            "strategy": "universal"
+        })
+
+    return result
 
 
 def predict_next(n_context: int = 5) -> str | None:
@@ -582,10 +1055,11 @@ def predict_next(n_context: int = 5) -> str | None:
 
 
 if __name__ == "__main__":
-    print(f"NEURON v4.2 - Distributed Scale Ledger")
+    print(f"NEURON v4.3 - The Shared Nerve")
     print(f"Ledger: {LEDGER_PATH}")
     print(f"BLAKE3 available: {HAS_BLAKE3}")
-    print(f"Supported models: {SUPPORTED_MODELS}")
+    print(f"Shared mode: {LEDGER_SHARED_MODE}")
+    print(f"Projects: {ALLOWED_PROJECTS}")
     print(f"Recovery curves: {RECOVERY_CURVE_MODELS}")
     print(f"Default curve: {DEFAULT_RECOVERY_CURVE}")
     print(f"Shard strategies: {SHARD_STRATEGIES}")

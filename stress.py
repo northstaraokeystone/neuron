@@ -1,8 +1,9 @@
 """
-NEURON v4.2: Stress Testing Module (Distributed Scale)
+NEURON v4.3: Stress Testing Module (The Shared Nerve)
 Heavy load testing, fault injection, benchmark reporting.
 Swarm testing (1000+ agents), sharded high-stress, batch writes.
-~200 lines. SLO-validated. Receipt-generating.
+Triad simulation for bio-silicon continuity validation.
+~300 lines. SLO-validated. Receipt-generating.
 """
 
 import json
@@ -43,6 +44,11 @@ from neuron import (
     SUPPORTED_MODELS,
     MAX_TASK_LEN,
     MAX_NEXT_LEN,
+    # v4.3 additions
+    load_ledger,
+    detect_system_gaps,
+    alpha_system_wide,
+    alpha_by_project,
 )
 
 # v4.2: Swarm and high-stress constants
@@ -697,8 +703,170 @@ def benchmark_report() -> dict:
     return result
 
 
+def triad_simulation(n_events: int = 500, project_weights: dict | None = None,
+                     include_gaps: bool = True, include_stress: bool = True,
+                     prune_threshold: int = 100) -> dict:
+    """Full triad simulation validating shared nerve behavior.
+
+    v4.3: Simulates realistic triad activity with all projects.
+
+    Args:
+        n_events: Total events across triad (default 500)
+        project_weights: Distribution across projects (default balanced)
+        include_gaps: Inject realistic gaps (default True)
+        include_stress: Inject stress events (default True)
+        prune_threshold: Max ledger size after pruning (default 100)
+
+    Returns:
+        Dict with simulation metrics and invariant checks
+    """
+    from nerve import simulate_triad_activity
+
+    temp_dir = tempfile.mkdtemp()
+    test_ledger = Path(temp_dir) / "triad_test_receipts.jsonl"
+    test_archive = Path(temp_dir) / "triad_test_archive.jsonl"
+    test_receipts = Path(temp_dir) / "triad_test_stress_receipts.jsonl"
+
+    import neuron
+    original_ledger = neuron.LEDGER_PATH
+    original_archive = neuron.ARCHIVE_PATH
+
+    original_receipts_env = os.environ.get("NEURON_RECEIPTS", "")
+    original_ledger_env = os.environ.get("NEURON_LEDGER", "")
+    original_archive_env = os.environ.get("NEURON_ARCHIVE", "")
+
+    try:
+        # Set up isolated environment
+        os.environ["NEURON_LEDGER"] = str(test_ledger)
+        os.environ["NEURON_ARCHIVE"] = str(test_archive)
+        os.environ["NEURON_RECEIPTS"] = str(test_receipts)
+
+        # Force module to use new paths
+        neuron.LEDGER_PATH = test_ledger
+        neuron.ARCHIVE_PATH = test_archive
+
+        start_time = time.perf_counter()
+
+        # Phase 1: Boot - Initialize shared ledger
+        neuron.append(
+            project="neuron",
+            task="Triad simulation boot",
+            next_action="generate_events"
+        )
+
+        # Phase 2: Activity - Generate mixed triad events
+        entries = simulate_triad_activity(n_events=n_events, seed=42)
+
+        # Phase 3: Stress - Inject additional stress events if enabled
+        stress_events = 0
+        if include_stress:
+            from nerve import (
+                trigger_grok_eviction,
+                trigger_agentproof_rollback,
+                trigger_axiom_entropy_spike,
+            )
+            for i in range(min(12, n_events // 40)):
+                trigger_grok_eviction(5000 + i * 100, f"stress_test_{i}")
+                trigger_agentproof_rollback(f"0xstress{i:04x}", "stress_test")
+                trigger_axiom_entropy_spike(0.9 + i * 0.01, 0.75)
+                stress_events += 3
+
+        # Phase 4: Gaps - Already included in simulate_triad_activity
+        gaps_injected = 0
+        if include_gaps:
+            ledger = neuron.load_ledger()
+            gaps = neuron.detect_system_gaps(ledger)
+            gaps_injected = len(gaps)
+
+        # Phase 5: Alpha - Calculate system-wide α
+        ledger = neuron.load_ledger()
+        system_alpha = neuron.alpha_system_wide(ledger)
+        alpha_by_project = neuron.alpha_by_project(ledger)
+
+        # Count entries by project BEFORE pruning (to check generation)
+        pre_prune_projects = set()
+        for e in ledger:
+            pre_prune_projects.add(e.get("project", "neuron"))
+
+        # Check for AI auto-events BEFORE pruning
+        ai_auto_events = sum(1 for e in ledger
+                            if e.get("source_context", {}).get("trigger") == "auto")
+
+        # Phase 6: Prune - Universal pruning to threshold
+        prune_result = neuron.prune(max_entries=prune_threshold, universal=True)
+
+        # Phase 7: Validate - Verify all invariants
+        final_ledger = neuron.load_ledger()
+        final_size = len(final_ledger)
+
+        # Count entries by project in final ledger
+        events_by_project = {}
+        for e in final_ledger:
+            proj = e.get("project", "neuron")
+            events_by_project[proj] = events_by_project.get(proj, 0) + 1
+
+        # Find max gap (for continuity check)
+        final_gaps = neuron.detect_system_gaps(final_ledger)
+        max_gap_hours = max((g["gap_minutes"] / 60 for g in final_gaps), default=0)
+
+        total_time = time.perf_counter() - start_time
+
+        # Invariant checks
+        # Check projects were GENERATED (pre-prune), not necessarily preserved
+        all_projects_present = len(pre_prune_projects) >= 4  # At least 4 projects generated
+        alpha_reasonable = 0.0 <= system_alpha <= 10.0
+        pruning_worked = final_size <= prune_threshold * 1.2  # Allow 20% buffer
+        ai_events_present = ai_auto_events > 0
+        continuity_maintained = max_gap_hours < 24  # No gaps > 24h
+
+        all_invariants_pass = all([
+            all_projects_present,
+            alpha_reasonable,
+            pruning_worked,
+            ai_events_present,
+            continuity_maintained
+        ])
+
+        result = {
+            "events_generated": n_events + 1 + stress_events,
+            "events_by_project": events_by_project,
+            "gaps_injected": gaps_injected,
+            "stress_events": stress_events,
+            "system_alpha_final": round(system_alpha, 2),
+            "alpha_by_project": alpha_by_project,
+            "pruned_total": prune_result.get("pruned_count", 0),
+            "ledger_final_size": final_size,
+            "ai_auto_events": ai_auto_events,
+            "max_gap_hours": round(max_gap_hours, 2),
+            "duration_seconds": round(total_time, 3),
+            "all_invariants_pass": all_invariants_pass,
+            "invariants": {
+                "all_projects_present": all_projects_present,
+                "alpha_reasonable": alpha_reasonable,
+                "pruning_worked": pruning_worked,
+                "ai_events_present": ai_events_present,
+                "continuity_maintained": continuity_maintained
+            }
+        }
+
+        _emit_receipt("triad_simulation_receipt", result)
+        return result
+
+    finally:
+        # Restore original environment
+        neuron.LEDGER_PATH = original_ledger
+        neuron.ARCHIVE_PATH = original_archive
+        os.environ["NEURON_LEDGER"] = original_ledger_env
+        os.environ["NEURON_ARCHIVE"] = original_archive_env
+        os.environ["NEURON_RECEIPTS"] = original_receipts_env
+
+        # Cleanup
+        import shutil
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
 if __name__ == "__main__":
-    print("NEURON v4.2 Stress Testing Module (Distributed Scale)")
+    print("NEURON v4.3 Stress Testing Module (The Shared Nerve)")
     print("=" * 55)
     print("\nRunning quick benchmark report...")
     start = time.perf_counter()

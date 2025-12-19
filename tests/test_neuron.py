@@ -152,7 +152,8 @@ class TestAppend:
         assert entry["energy"] == 1.5
 
     def test_invalid_project(self):
-        with pytest.raises(ValueError):
+        # v4.3: Invalid project now raises StopRule instead of ValueError
+        with pytest.raises(StopRule):
             append("invalid", "task", "next", None)
 
     def test_truncation(self):
