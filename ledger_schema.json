@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "NEURON v4 Ledger Entry",
-  "description": "Inference-integrated ledger entry with multi-model support, context tracking, and biological grounding",
+  "title": "NEURON v4.3 Ledger Entry (The Shared Nerve)",
+  "description": "Triad-integrated ledger entry with multi-project support, system-wide alpha, and bio-silicon continuity",
   "type": "object",
   "required": ["ts", "project", "model", "task", "next", "hash", "salience", "replay_count", "energy", "token_count"],
   "properties": {
@@ -12,8 +12,14 @@
     },
     "project": {
       "type": "string",
-      "enum": ["agentproof", "axiom", "neuron"],
-      "description": "Project identifier"
+      "enum": ["agentproof", "axiom", "neuron", "grok", "human"],
+      "description": "Source project identifier (v4.3: extended for triad)"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": ["task", "eviction", "rollback", "discovery", "interrupt", "grok_eviction", "grok_reset", "agentproof_rollback", "agentproof_anchor", "axiom_law_discovery", "axiom_entropy_spike", "human_interrupt", "human_return", "unknown"],
+      "default": "task",
+      "description": "Type of event (v4.3: AI event types for auto-append)"
     },
     "model": {
       "type": "string",
@@ -74,6 +80,11 @@
       "maxLength": 500,
       "default": "",
       "description": "Compressed snapshot of context (≤500 chars)"
+    },
+    "source_context": {
+      "type": "object",
+      "default": {},
+      "description": "Optional metadata from source project (v4.3: triad context)"
     }
   },
   "additionalProperties": false
