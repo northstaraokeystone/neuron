@@ -1,27 +1,45 @@
-"""Tests for NEURON v2 shared ledger."""
+"""Tests for NEURON v3 biologically grounded ledger."""
 
 import json
 import os
 import tempfile
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
-# Set up test ledger path before importing neuron
+# Set up test ledger paths before importing neuron
 TEST_LEDGER = Path(tempfile.gettempdir()) / "test_receipts.jsonl"
+TEST_ARCHIVE = Path(tempfile.gettempdir()) / "test_archive.jsonl"
 os.environ["NEURON_LEDGER"] = str(TEST_LEDGER)
+os.environ["NEURON_ARCHIVE"] = str(TEST_ARCHIVE)
 
-from neuron import dual_hash, append, replay, alpha, ALLOWED_PROJECTS
+from neuron import (
+    ALLOWED_PROJECTS,
+    alpha,
+    append,
+    consolidate,
+    dual_hash,
+    energy_estimate,
+    predict_next,
+    prune,
+    recovery_cost,
+    replay,
+    salience_decay,
+)
 
 
 @pytest.fixture(autouse=True)
 def clean_ledger():
     """Remove test ledger before and after each test."""
-    if TEST_LEDGER.exists():
-        TEST_LEDGER.unlink()
+    for path in [TEST_LEDGER, TEST_ARCHIVE]:
+        if path.exists():
+            path.unlink()
     yield
-    if TEST_LEDGER.exists():
-        TEST_LEDGER.unlink()
+    for path in [TEST_LEDGER, TEST_ARCHIVE]:
+        if path.exists():
+            path.unlink()
 
 
 class TestDualHash:
@@ -43,6 +61,66 @@ class TestDualHash:
         assert result1 == result2
 
 
+class TestEnergyEstimate:
+    def test_simple_task(self):
+        energy = energy_estimate("fix bug", "test")
+        assert 0.5 <= energy <= 2.0
+
+    def test_technical_task_higher_energy(self):
+        simple = energy_estimate("fix bug", "test")
+        technical = energy_estimate("implement merkle proof federation", "verify hash entropy")
+        assert technical > simple
+
+    def test_longer_task_higher_energy(self):
+        short = energy_estimate("fix", "test")
+        long = energy_estimate("implement the complete authentication flow", "write integration tests")
+        assert long > short
+
+
+class TestSalienceDecay:
+    def test_fresh_entry_full_salience(self):
+        entry = {"ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "salience": 1.0, "replay_count": 0}
+        decayed = salience_decay(entry)
+        assert decayed > 0.99  # Nearly 1.0 for fresh entry
+
+    def test_old_entry_decayed(self):
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        entry = {"ts": old_ts, "salience": 1.0, "replay_count": 0}
+        decayed = salience_decay(entry)
+        assert decayed < 0.5  # Significantly decayed after 30 days
+
+    def test_replay_slows_decay(self):
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        no_replay = {"ts": old_ts, "salience": 1.0, "replay_count": 0}
+        with_replay = {"ts": old_ts, "salience": 1.0, "replay_count": 5}
+        assert salience_decay(with_replay) > salience_decay(no_replay)
+
+
+class TestRecoveryCost:
+    def test_zero_gap(self):
+        assert recovery_cost(0) == 1.0
+
+    def test_short_gap(self):
+        cost = recovery_cost(15)
+        assert 1.0 < cost < 2.0
+
+    def test_medium_gap(self):
+        cost = recovery_cost(60)
+        assert 2.0 < cost < 3.5
+
+    def test_long_gap(self):
+        cost = recovery_cost(120)
+        assert 3.0 < cost < 4.0
+
+    def test_nonlinear_increase(self):
+        c15 = recovery_cost(15)
+        c60 = recovery_cost(60)
+        c120 = recovery_cost(120)
+        # Recovery cost should increase but with diminishing returns
+        assert c15 < c60 < c120
+        assert (c60 - c15) > (c120 - c60)  # Diminishing returns
+
+
 class TestAppend:
     def test_basic_append(self):
         entry = append("neuron", "test task", "next action", "abc123")
@@ -52,6 +130,17 @@ class TestAppend:
         assert entry["commit"] == "abc123"
         assert "ts" in entry
         assert "hash" in entry
+
+    def test_new_v3_fields(self):
+        entry = append("neuron", "test task", "next action", "abc123")
+        assert entry["salience"] == 1.0
+        assert entry["replay_count"] == 0
+        assert "energy" in entry
+        assert 0.5 <= entry["energy"] <= 2.0
+
+    def test_custom_energy(self):
+        entry = append("neuron", "task", "next", None, energy=1.5)
+        assert entry["energy"] == 1.5
 
     def test_invalid_project(self):
         with pytest.raises(ValueError):
@@ -88,6 +177,15 @@ class TestReplay:
         assert result[0]["task"] == "task3"
         assert result[1]["task"] == "task4"
 
+    def test_increment_replay(self):
+        append("neuron", "task1", "next1", None)
+        initial = replay(n=1)[0]
+        assert initial["replay_count"] == 0
+
+        replay(n=1, increment_replay=True)
+        after = replay(n=1)[0]
+        assert after["replay_count"] == 1
+
 
 class TestAlpha:
     def test_empty_ledger(self):
@@ -101,3 +199,112 @@ class TestAlpha:
         result = alpha(threshold_minutes=60)
         assert result["total_entries"] == 2
         assert result["gaps_detected"] == 0
+
+    def test_v3_variance_fields(self):
+        append("neuron", "task1", "next1", None)
+        append("neuron", "task2", "next2", None)
+        result = alpha(threshold_minutes=60)
+        assert "alpha_variance" in result
+        assert "alpha_std" in result
+        assert "expert_novice_ratio" in result
+
+
+class TestConsolidate:
+    def test_empty_ledger(self):
+        result = consolidate()
+        assert result["consolidated_count"] == 0
+
+    def test_consolidation_boosts_salience(self):
+        # Create entries with gaps
+        append("neuron", "task1", "next1", None)
+        time.sleep(0.1)
+        append("neuron", "task2", "next2", None)
+
+        # Consolidate with low threshold for testing
+        result = consolidate(top_k=5, alpha_threshold=0.0)
+        assert isinstance(result["consolidated_count"], int)
+        assert isinstance(result["salience_boost"], float)
+
+
+class TestPrune:
+    def test_empty_ledger(self):
+        result = prune()
+        assert result["pruned_count"] == 0
+        assert result["ledger_size_before"] == 0
+        assert result["ledger_size_after"] == 0
+
+    def test_prune_preserves_recent(self):
+        append("neuron", "task1", "next1", None)
+        result = prune(max_age_days=30, salience_threshold=0.1)
+        assert result["pruned_count"] == 0
+        assert result["ledger_size_after"] == 1
+
+    def test_prune_preserves_high_replay(self):
+        # Even with aggressive pruning, high replay_count entries are preserved
+        append("neuron", "task1", "next1", None)
+        # Simulate high replay count by multiple increments
+        for _ in range(6):
+            replay(n=1, increment_replay=True)
+
+        result = prune(max_age_days=0, salience_threshold=2.0)  # Aggressive
+        # Entry preserved due to high replay_count
+        assert result["ledger_size_after"] == 1
+
+
+class TestPredictNext:
+    def test_empty_ledger(self):
+        result = predict_next()
+        assert result is None
+
+    def test_single_entry(self):
+        append("neuron", "task1", "next1", None)
+        result = predict_next()
+        assert result is None  # Need at least 2 entries
+
+    def test_pattern_prediction(self):
+        append("neuron", "implement module A", "write tests", None)
+        append("neuron", "implement module B", "write tests", None)
+        append("neuron", "implement module C", "pending", None)
+
+        prediction = predict_next(n_context=5)
+        # Should suggest "write tests" based on pattern
+        assert prediction is not None
+
+
+class TestIntegration:
+    def test_full_lifecycle(self):
+        """Test the full lifecycle of an entry: append -> replay -> consolidate -> decay check."""
+        # Append
+        entry = append("neuron", "implement federation", "write merkle proofs", "abc123")
+        assert entry["salience"] == 1.0
+        assert entry["energy"] >= 0.5  # Valid energy range
+
+        # Replay with increment
+        replayed = replay(n=1, increment_replay=True)
+        assert replayed[0]["replay_count"] == 1
+
+        # Check decay is slowed by replay
+        decayed = salience_decay(replayed[0])
+        assert decayed > 0.99  # Fresh entry, almost no decay
+
+        # Consolidate
+        result = consolidate(top_k=5, alpha_threshold=0.0)
+        assert "consolidated_count" in result
+
+        # Prune (should not prune fresh entries)
+        prune_result = prune(max_age_days=30, salience_threshold=0.1)
+        assert prune_result["pruned_count"] == 0
+
+    def test_recovery_cost_integration(self):
+        """Verify recovery cost follows non-linear curve."""
+        costs = [recovery_cost(m) for m in [0, 15, 30, 60, 90, 120, 180, 240]]
+
+        # All costs should be >= 1.0
+        assert all(c >= 1.0 for c in costs)
+
+        # Should increase monotonically
+        for i in range(1, len(costs)):
+            assert costs[i] >= costs[i-1]
+
+        # At 120 minutes, should be around 3.5
+        assert 3.0 < recovery_cost(120) < 4.0
