@@ -140,7 +140,7 @@ class TestBenchmarkReport:
         assert "pass_count" in result
         assert "fail_count" in result
         assert "overall_status" in result
-        assert result["neuron_version"] == "4.1"
+        assert result["neuron_version"] == "4.2"
 
     def test_benchmark_report_slo_fields(self):
         """Test that all expected SLOs are present."""

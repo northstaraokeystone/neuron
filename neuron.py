@@ -1,8 +1,8 @@
 """
-NEURON v4.1: Stress-Hardened Ledger
+NEURON v4.2: Distributed Scale Ledger
 volatile state + persistent proof = resilient inference
-Configurable τ, SLO-validated, stress-tested.
-~220 lines. Multi-model. Inference-native.
+Sharded ledger, recovery curves, swarm-tested.
+~280 lines. Multi-model. Inference-native.
 """
 
 import hashlib
@@ -92,6 +92,45 @@ MIN_AGE_TO_PRUNE_DAYS = 7
 # Sync
 SYNC_CONFLICT_RESOLUTION = "last_write_wins"
 
+# ============================================
+# v4.2 SHARDING CONSTANTS
+# ============================================
+DEFAULT_SHARD_COUNT = 4
+MAX_SHARD_COUNT = 64
+SHARD_STRATEGIES = ["hash", "time", "project", "model"]
+DEFAULT_SHARD_STRATEGY = "hash"
+SHARD_MAX_ENTRIES = 1_000_000
+SHARD_EVICTION_PERCENT = 0.20
+
+# ============================================
+# v4.2 MULTI-USER SWARM
+# ============================================
+SWARM_DEFAULT_AGENTS = 1000
+SWARM_APPEND_PER_AGENT = 100
+SWARM_CONFLICT_THRESHOLD = 0
+
+# ============================================
+# v4.2 HIGH STRESS TARGETS
+# ============================================
+HIGH_STRESS_APPEND_TARGET = 85_000
+HIGH_STRESS_ENTRIES = 10_000_000
+HIGH_STRESS_WORKERS = 16
+HIGH_STRESS_OVERHEAD_MAX = 0.01
+
+# ============================================
+# v4.2 RECOVERY CURVES
+# ============================================
+RECOVERY_CURVE_MODELS = ["exponential_decay", "power_law", "linear"]
+DEFAULT_RECOVERY_CURVE = "exponential_decay"
+
+# Exponential decay (Monsell 2003)
+EXP_DECAY_K = 4.0
+EXP_DECAY_TAU = 120.0
+
+# Power law (Altmann & Trafton 2002)
+POWER_LAW_ALPHA = 0.5
+POWER_LAW_SCALE = 2.0
+
 # Energy estimation
 TECHNICAL_TERMS = ["federation", "merkle", "entropy", "kan", "spline",
                    "receipt", "anchor", "proof", "hash", "topology"]
@@ -130,19 +169,34 @@ def salience_decay(entry: dict, current_ts: datetime | None = None) -> float:
     return base_salience * math.exp(-DECAY_RATE_PER_DAY * age_days / replay_boost)
 
 
-def recovery_cost(gap_minutes: float, tau: float = DEFAULT_RECOVERY_TAU) -> float:
-    """Non-linear cost: exponential decay model calibrated to human data (Monsell 2003).
+def recovery_cost(gap_minutes: float, tau: float = DEFAULT_RECOVERY_TAU,
+                  model: str = DEFAULT_RECOVERY_CURVE) -> float:
+    """Non-linear cost: pluggable recovery model (v4.2).
 
     Args:
         gap_minutes: Time gap since last activity in minutes
         tau: Recovery time constant (default 120.0). Lower τ = faster recovery expected = higher cost.
              Use TAU_PRESETS["quick_task"]=15 for short tasks, TAU_PRESETS["deep_work"]=240 for extended focus.
+        model: Recovery curve model - "exponential_decay" (default), "power_law", or "linear"
 
     Returns:
         Recovery cost multiplier (1.0 to ~5.0)
     """
     tau = max(TAU_RANGE[0], min(TAU_RANGE[1], tau))  # Clamp to valid range
-    return 1.0 + RECOVERY_K * (1 - math.exp(-gap_minutes / tau))
+
+    if model == "exponential_decay":
+        return 1.0 + RECOVERY_K * (1 - math.exp(-gap_minutes / tau))
+    elif model == "power_law":
+        if gap_minutes <= 0:
+            return 1.0
+        return 1.0 + POWER_LAW_SCALE * (gap_minutes ** POWER_LAW_ALPHA)
+    elif model == "linear":
+        if gap_minutes <= 0:
+            return 1.0
+        return 1.0 + gap_minutes / tau
+    else:
+        # Default to exponential decay
+        return 1.0 + RECOVERY_K * (1 - math.exp(-gap_minutes / tau))
 
 
 def append(project: str, task: str, next_action: str, commit: str | None = None, energy: float | None = None,
@@ -304,23 +358,25 @@ def sync_ledger(remote_path: str) -> dict:
     }
 
 
-def alpha(threshold_minutes: int = DEFAULT_GAP_THRESHOLD_MIN, tau: float = DEFAULT_RECOVERY_TAU) -> dict:
-    """Calculate α with variance, expert_novice_ratio, and configurable τ.
+def alpha(threshold_minutes: int = DEFAULT_GAP_THRESHOLD_MIN, tau: float = DEFAULT_RECOVERY_TAU,
+          curve_model: str = DEFAULT_RECOVERY_CURVE) -> dict:
+    """Calculate α with variance, expert_novice_ratio, configurable τ, and recovery curve model.
 
     Args:
         threshold_minutes: Minimum gap to consider (default 60)
         tau: Recovery time constant for cost calculations (default 120.0).
              Lower τ = faster recovery expected. Use TAU_PRESETS for common values.
+        curve_model: Recovery curve model - "exponential_decay" (default), "power_law", or "linear"
 
     Returns:
-        Dict with gap statistics including tau_used field
+        Dict with gap statistics including tau_used and curve_model fields
     """
     tau = max(TAU_RANGE[0], min(TAU_RANGE[1], tau))  # Clamp to valid range
     entries = _read_ledger()
     if len(entries) < 2:
         return {"total_entries": len(entries), "gaps_detected": 0, "gaps": [], "alpha_mean": 0.0,
                 "alpha_min": 0.0, "alpha_max": 0.0, "alpha_variance": 0.0, "alpha_std": 0.0,
-                "expert_novice_ratio": 1.0, "tau_used": tau}
+                "expert_novice_ratio": 1.0, "tau_used": tau, "curve_model": curve_model}
     entries.sort(key=lambda e: e.get("ts", ""))
     gaps, threshold_seconds = [], threshold_minutes * 60
     for i in range(1, len(entries)):
@@ -332,7 +388,7 @@ def alpha(threshold_minutes: int = DEFAULT_GAP_THRESHOLD_MIN, tau: float = DEFAU
             # Recovery time scaled by τ factor
             tau_factor = tau / DEFAULT_RECOVERY_TAU
             recovery_min = max(1.0, (gap_seconds / 60 / 10) * tau_factor)
-            gap_recovery_cost = recovery_cost(gap_minutes, tau)
+            gap_recovery_cost = recovery_cost(gap_minutes, tau, model=curve_model)
             gaps.append({"start": entries[i-1]["ts"], "end": entries[i]["ts"], "duration_min": round(gap_minutes, 1),
                          "recovery_min": round(recovery_min, 1), "alpha": round(gap_minutes / recovery_min, 1),
                          "recovery_cost": round(gap_recovery_cost, 2)})
@@ -340,14 +396,14 @@ def alpha(threshold_minutes: int = DEFAULT_GAP_THRESHOLD_MIN, tau: float = DEFAU
     if not alpha_values:
         return {"total_entries": len(entries), "gaps_detected": 0, "gaps": [], "alpha_mean": 0.0,
                 "alpha_min": 0.0, "alpha_max": 0.0, "alpha_variance": 0.0, "alpha_std": 0.0,
-                "expert_novice_ratio": 1.0, "tau_used": tau}
+                "expert_novice_ratio": 1.0, "tau_used": tau, "curve_model": curve_model}
     mean_a = sum(alpha_values) / len(alpha_values)
     variance = sum((a - mean_a) ** 2 for a in alpha_values) / len(alpha_values)
     return {"total_entries": len(entries), "gaps_detected": len(gaps), "gaps": gaps,
             "alpha_mean": round(mean_a, 1), "alpha_min": round(min(alpha_values), 1), "alpha_max": round(max(alpha_values), 1),
             "alpha_variance": round(variance, 2), "alpha_std": round(math.sqrt(variance), 2),
             "expert_novice_ratio": round(max(alpha_values) / min(alpha_values), 1) if min(alpha_values) > 0 else float('inf'),
-            "tau_used": tau}
+            "tau_used": tau, "curve_model": curve_model}
 
 
 def consolidate(top_k: int = DEFAULT_CONSOLIDATE_TOP_K, alpha_threshold: float = DEFAULT_ALPHA_THRESHOLD) -> dict:
@@ -431,6 +487,10 @@ def predict_next(n_context: int = 5) -> str | None:
 
 
 if __name__ == "__main__":
-    print(f"NEURON v4 - Ledger: {LEDGER_PATH}")
+    print(f"NEURON v4.2 - Distributed Scale Ledger")
+    print(f"Ledger: {LEDGER_PATH}")
     print(f"BLAKE3 available: {HAS_BLAKE3}")
     print(f"Supported models: {SUPPORTED_MODELS}")
+    print(f"Recovery curves: {RECOVERY_CURVE_MODELS}")
+    print(f"Default curve: {DEFAULT_RECOVERY_CURVE}")
+    print(f"Shard strategies: {SHARD_STRATEGIES}")
