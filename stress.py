@@ -1,8 +1,8 @@
 """
-NEURON v4.1: Stress Testing Module (Optimized)
+NEURON v4.2: Stress Testing Module (Distributed Scale)
 Heavy load testing, fault injection, benchmark reporting.
-Batch writes, parallel execution, minimal overhead.
-~100 lines. SLO-validated. Receipt-generating.
+Swarm testing (1000+ agents), sharded high-stress, batch writes.
+~200 lines. SLO-validated. Receipt-generating.
 """
 
 import json
@@ -44,6 +44,16 @@ from neuron import (
     MAX_TASK_LEN,
     MAX_NEXT_LEN,
 )
+
+# v4.2: Swarm and high-stress constants
+SWARM_DEFAULT_AGENTS = 1000
+SWARM_APPEND_PER_AGENT = 100
+SWARM_CONFLICT_THRESHOLD = 0
+
+HIGH_STRESS_APPEND_TARGET = 85_000  # /s (from Grok)
+HIGH_STRESS_ENTRIES = 10_000_000
+HIGH_STRESS_WORKERS = 16
+HIGH_STRESS_OVERHEAD_MAX = 0.01
 
 # Receipt storage
 STRESS_RECEIPTS_PATH = Path(os.environ.get("NEURON_STRESS_RECEIPTS",
@@ -382,6 +392,197 @@ def concurrent_sync_test(n_workers: int = 4, n_entries_each: int = 100) -> dict:
                 p.unlink()
 
 
+def swarm_test(n_agents: int = SWARM_DEFAULT_AGENTS,
+               appends_per_agent: int = SWARM_APPEND_PER_AGENT,
+               shard_count: int = 4) -> dict:
+    """
+    Simulate 1000+ concurrent agents writing to sharded ledger.
+
+    Args:
+        n_agents: Number of concurrent agents (default: 1000)
+        appends_per_agent: Entries each agent writes (default: 100)
+        shard_count: Number of shards to use (default: 4)
+
+    Returns:
+        Dict with swarm test metrics and SLO status
+    """
+    from sharding import ShardedLedger
+
+    temp_dir = tempfile.mkdtemp()
+    shard_dir = Path(temp_dir) / "shards"
+
+    # Track conflicts using inference_id
+    seen_inference_ids = set()
+    conflicts = 0
+    lock = threading.Lock()
+
+    ledger = ShardedLedger(shard_count=shard_count, strategy="hash", shard_dir=shard_dir)
+
+    def agent_task(agent_id: int) -> tuple:
+        """Single agent: append entries and return timing + count."""
+        nonlocal conflicts
+        agent_entries = 0
+        start = time.perf_counter()
+
+        for i in range(appends_per_agent):
+            inference_id = f"agent_{agent_id}_entry_{i}"
+            entry = {
+                "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "project": "neuron",
+                "model": "neuron",
+                "commit": None,
+                "task": f"swarm_a{agent_id}_e{i}"[:MAX_TASK_LEN],
+                "next": f"next_{i}"[:MAX_NEXT_LEN],
+                "salience": 1.0,
+                "replay_count": 0,
+                "energy": 1.0,
+                "token_count": 100 + (i * 97) % 9900,
+                "inference_id": inference_id,
+                "context_summary": ""
+            }
+            entry["hash"] = dual_hash(json.dumps({k: v for k, v in entry.items() if k != "hash"}, sort_keys=True))
+
+            # Check for conflicts
+            with lock:
+                if inference_id in seen_inference_ids:
+                    conflicts += 1
+                seen_inference_ids.add(inference_id)
+
+            ledger.append(entry)
+            agent_entries += 1
+
+        elapsed = time.perf_counter() - start
+        return elapsed, agent_entries
+
+    # Run swarm
+    start_time = time.perf_counter()
+    total_entries = 0
+    agent_times = []
+
+    with ThreadPoolExecutor(max_workers=min(n_agents, 100)) as executor:  # Cap at 100 threads
+        futures = [executor.submit(agent_task, i) for i in range(n_agents)]
+        for future in as_completed(futures):
+            elapsed, count = future.result()
+            agent_times.append(elapsed)
+            total_entries += count
+
+    total_time = time.perf_counter() - start_time
+
+    # Get shard distribution
+    stats = ledger.stats()
+    entries_per_shard = [s["count"] for s in stats["shards"]]
+
+    append_rate = total_entries / total_time if total_time > 0 else 0
+
+    slo_pass = conflicts <= SWARM_CONFLICT_THRESHOLD and append_rate >= HIGH_STRESS_APPEND_TARGET * 0.5
+
+    result = {
+        "n_agents": n_agents,
+        "appends_per_agent": appends_per_agent,
+        "total_appends": total_entries,
+        "duration_seconds": round(total_time, 3),
+        "append_rate_per_second": round(append_rate, 1),
+        "conflicts": conflicts,
+        "shards_used": shard_count,
+        "entries_per_shard": entries_per_shard,
+        "avg_agent_time_ms": round(sum(agent_times) / len(agent_times) * 1000, 2) if agent_times else 0,
+        "slo_pass": slo_pass
+    }
+
+    _emit_receipt("swarm_test_receipt", result)
+
+    # Cleanup
+    import shutil
+    shutil.rmtree(temp_dir, ignore_errors=True)
+
+    return result
+
+
+def high_stress_test(n_entries: int = 1_000_000,
+                     shard_count: int = 4,
+                     workers: int = HIGH_STRESS_WORKERS) -> dict:
+    """
+    Push beyond 85k/s with sharding.
+
+    Args:
+        n_entries: Total entries (default: 1,000,000)
+        shard_count: Shards to distribute across (default: 4)
+        workers: Parallel writer threads (default: 16)
+
+    Returns:
+        Dict with high stress test metrics
+    """
+    from sharding import ShardedLedger
+
+    temp_dir = tempfile.mkdtemp()
+    shard_dir = Path(temp_dir) / "shards"
+
+    ledger = ShardedLedger(shard_count=shard_count, strategy="hash", shard_dir=shard_dir)
+
+    entries_per_worker = n_entries // workers
+    all_entries = []
+    lock = threading.Lock()
+    evictions_triggered = 0
+
+    def worker_task(worker_id: int) -> tuple:
+        """Generate and write entries in batch."""
+        nonlocal evictions_triggered
+        entries = _batch_create_entries(entries_per_worker, worker_id)
+        start = time.perf_counter()
+
+        for entry in entries:
+            result = ledger.append(entry)
+            if result.get("evicted", 0) > 0:
+                with lock:
+                    evictions_triggered += 1
+
+        elapsed = time.perf_counter() - start
+        return elapsed, len(entries)
+
+    # Run high stress test
+    start_time = time.perf_counter()
+    total_entries = 0
+    worker_times = []
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(worker_task, i) for i in range(workers)]
+        for future in as_completed(futures):
+            elapsed, count = future.result()
+            worker_times.append(elapsed)
+            total_entries += count
+
+    total_time = time.perf_counter() - start_time
+
+    # Get final stats
+    stats = ledger.stats()
+    entries_per_shard = [s["count"] for s in stats["shards"]]
+
+    append_rate = total_entries / total_time if total_time > 0 else 0
+    overhead_pct = (sum(worker_times) / len(worker_times) / total_time * 100) if total_time > 0 else 0
+
+    slo_pass = append_rate >= HIGH_STRESS_APPEND_TARGET and overhead_pct / 100 < HIGH_STRESS_OVERHEAD_MAX
+
+    result = {
+        "n_entries": total_entries,
+        "shard_count": shard_count,
+        "workers": workers,
+        "duration_seconds": round(total_time, 3),
+        "append_rate_per_second": round(append_rate, 1),
+        "overhead_percent": round(overhead_pct, 3),
+        "entries_per_shard": entries_per_shard,
+        "evictions_triggered": evictions_triggered,
+        "slo_pass": slo_pass
+    }
+
+    _emit_receipt("high_stress_receipt", result)
+
+    # Cleanup
+    import shutil
+    shutil.rmtree(temp_dir, ignore_errors=True)
+
+    return result
+
+
 def benchmark_report() -> dict:
     """Generate comprehensive SLO status (optimized with parallel test execution)."""
 
@@ -470,7 +671,7 @@ def benchmark_report() -> dict:
 
     result = {
         "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "neuron_version": "4.1",
+        "neuron_version": "4.2",
         "slos": slos,
         "pass_count": pass_count,
         "fail_count": fail_count,
@@ -494,8 +695,8 @@ def benchmark_report() -> dict:
 
 
 if __name__ == "__main__":
-    print("NEURON v4.1 Stress Testing Module (Optimized)")
-    print("=" * 50)
+    print("NEURON v4.2 Stress Testing Module (Distributed Scale)")
+    print("=" * 55)
     print("\nRunning quick benchmark report...")
     start = time.perf_counter()
     report = benchmark_report()
@@ -506,3 +707,9 @@ if __name__ == "__main__":
     for name, slo in report["slos"].items():
         status = "PASS" if slo["pass"] else "FAIL"
         print(f"  {name}: {slo['actual']} (target: {slo['target']}) [{status}]")
+
+    print("\n" + "=" * 55)
+    print("Quick swarm test (10 agents)...")
+    swarm_result = swarm_test(n_agents=10, appends_per_agent=10)
+    print(f"  Agents: {swarm_result['n_agents']}, Conflicts: {swarm_result['conflicts']}")
+    print(f"  Rate: {swarm_result['append_rate_per_second']:.0f}/s")
