@@ -97,6 +97,16 @@ TECHNICAL_TERMS = ["federation", "merkle", "entropy", "kan", "spline",
                    "receipt", "anchor", "proof", "hash", "topology"]
 
 
+# CLAUDEME §8 Core Exception
+class StopRule(Exception):
+    """CLAUDEME §8: Exception for stoprule failures. Replaces bare except: pass."""
+
+    def __init__(self, rule_name: str, message: str, context: dict | None = None):
+        self.rule_name = rule_name
+        self.context = context or {}
+        super().__init__(f"STOPRULE[{rule_name}]: {message}")
+
+
 def dual_hash(data: bytes | str) -> str:
     """Compute SHA256:BLAKE3 hash per CLAUDEME §8."""
     if isinstance(data, str):
@@ -104,6 +114,76 @@ def dual_hash(data: bytes | str) -> str:
     sha256_hex = hashlib.sha256(data).hexdigest()
     blake3_hex = blake3.blake3(data).hexdigest() if HAS_BLAKE3 else hashlib.sha256(b"blake3:" + data).hexdigest()
     return f"{sha256_hex}:{blake3_hex}"
+
+
+def merkle(items: list) -> str:
+    """Compute merkle root hash of items per CLAUDEME §8.
+
+    Args:
+        items: List of items to hash (strings, bytes, or dicts)
+
+    Returns:
+        Dual hash (SHA256:BLAKE3) of the merkle root
+    """
+    if not items:
+        return dual_hash(b"empty")
+
+    # Convert items to hashes
+    hashes = []
+    for item in items:
+        if isinstance(item, dict):
+            item = json.dumps(item, sort_keys=True)
+        if isinstance(item, str):
+            item = item.encode("utf-8")
+        hashes.append(dual_hash(item))
+
+    # Build merkle tree
+    while len(hashes) > 1:
+        if len(hashes) % 2 == 1:
+            hashes.append(hashes[-1])  # Duplicate last if odd
+        new_hashes = []
+        for i in range(0, len(hashes), 2):
+            combined = f"{hashes[i]}|{hashes[i+1]}"
+            new_hashes.append(dual_hash(combined))
+        hashes = new_hashes
+
+    return hashes[0]
+
+
+# Receipt storage path
+RECEIPTS_PATH = Path(os.environ.get("NEURON_RECEIPTS", Path.home() / "neuron" / "receipts.jsonl"))
+
+
+def emit_receipt(receipt_type: str, data: dict) -> dict:
+    """Emit a receipt to the receipts ledger per CLAUDEME §4.
+
+    SCHEMA: {type, ts, hash, **data}
+    EMIT: This function
+    TEST: test_emit_receipt in tests/test_neuron.py
+    STOPRULE: stoprule_receipt_emission on failure
+
+    Args:
+        receipt_type: Type identifier for the receipt
+        data: Receipt payload data
+
+    Returns:
+        Complete receipt dict with hash and timestamp
+    """
+    receipt = {
+        "type": receipt_type,
+        "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        **data
+    }
+    receipt["hash"] = dual_hash(json.dumps({k: v for k, v in receipt.items() if k != "hash"}, sort_keys=True))
+
+    try:
+        RECEIPTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(RECEIPTS_PATH, "a") as f:
+            f.write(json.dumps(receipt) + "\n")
+    except Exception as e:
+        raise StopRule("receipt_emission", f"Failed to emit receipt: {e}", {"receipt_type": receipt_type})
+
+    return receipt
 
 
 def energy_estimate(task: str, next_action: str, token_count: int = 0) -> float:

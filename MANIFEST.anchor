@@ -1,0 +1,54 @@
+# NEURON v4.1 MANIFEST.anchor
+# CLAUDEME T+48h Deploy Artifact
+# Generated: 2025-12-19
+#
+# This file anchors the deployment state of NEURON.
+# All hashes use dual_hash (SHA256:BLAKE3) per CLAUDEME §8.
+
+[manifest]
+version = "4.1"
+codename = "stress-hardened-ledger"
+claudeme_compliant = true
+
+[gates]
+t2h = "gate_t2h.sh"
+t24h = "gate_t24h.sh"
+t48h = "gate_t48h.sh"
+
+[core_files]
+neuron.py = "core ledger implementation"
+stress.py = "stress testing module"
+cli.py = "command line interface"
+spec.md = "specification document"
+ledger_schema.json = "JSON schema for entries"
+
+[core_functions]
+dual_hash = "SHA256:BLAKE3 hashing per CLAUDEME §8"
+emit_receipt = "Receipt emission per CLAUDEME §4"
+merkle = "Merkle root computation per CLAUDEME §8"
+StopRule = "Exception class per CLAUDEME §8"
+
+[tests]
+test_neuron.py = "Core functionality tests"
+test_stress.py = "Stress testing tests"
+test_inference.py = "Inference integration tests"
+test_failures.py = "Fault injection tests"
+
+[slo_targets]
+append_overhead_max = "0.7%"
+append_throughput_min = "1500/s"
+recovery_rate_min = "97%"
+pruning_compression_min = "99.6%"
+context_restore_max = "45s"
+
+[biological_grounding]
+consolidate = "Sharp-wave ripples (Wilson & McNaughton 1994)"
+prune = "Synaptic downscaling (Tononi & Cirelli 2014)"
+recovery_cost = "Task-set inertia (Monsell 2003)"
+predict_next = "Prospective memory"
+replay_to_context = "Hippocampal pattern completion"
+
+[compliance]
+law_1 = "No receipt → not real"
+law_2 = "No test → not shipped"
+law_3 = "No gate → not alive"
