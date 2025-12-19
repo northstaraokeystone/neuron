@@ -1,9 +1,9 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "NEURON v3 Ledger Entry",
-  "description": "Biologically grounded ledger entry with salience, replay tracking, and cognitive load estimation",
+  "title": "NEURON v4 Ledger Entry",
+  "description": "Inference-integrated ledger entry with multi-model support, context tracking, and biological grounding",
   "type": "object",
-  "required": ["ts", "project", "task", "next", "hash", "salience", "replay_count", "energy"],
+  "required": ["ts", "project", "model", "task", "next", "hash", "salience", "replay_count", "energy", "token_count"],
   "properties": {
     "ts": {
       "type": "string",
@@ -14,6 +14,11 @@
       "type": "string",
       "enum": ["agentproof", "axiom", "neuron"],
       "description": "Project identifier"
+    },
+    "model": {
+      "type": "string",
+      "enum": ["grok", "claude", "gemini", "neuron"],
+      "description": "LLM model that generated this entry"
     },
     "commit": {
       "type": ["string", "null"],
@@ -52,6 +57,23 @@
       "minimum": 0.5,
       "maximum": 2.0,
       "description": "Cognitive load estimate (higher = more complex context)"
+    },
+    "token_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Context window utilization at append time"
+    },
+    "inference_id": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Unique identifier for inference cycle (e.g., inf_abc123)"
+    },
+    "context_summary": {
+      "type": "string",
+      "maxLength": 500,
+      "default": "",
+      "description": "Compressed snapshot of context (≤500 chars)"
     }
   },
   "additionalProperties": false
