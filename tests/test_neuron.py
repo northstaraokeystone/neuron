@@ -12,8 +12,10 @@ import pytest
 # Set up test ledger paths before importing neuron
 TEST_LEDGER = Path(tempfile.gettempdir()) / "test_receipts.jsonl"
 TEST_ARCHIVE = Path(tempfile.gettempdir()) / "test_archive.jsonl"
+TEST_RECEIPTS = Path(tempfile.gettempdir()) / "test_emit_receipts.jsonl"
 os.environ["NEURON_LEDGER"] = str(TEST_LEDGER)
 os.environ["NEURON_ARCHIVE"] = str(TEST_ARCHIVE)
+os.environ["NEURON_RECEIPTS"] = str(TEST_RECEIPTS)
 
 from neuron import (
     ALLOWED_PROJECTS,
@@ -21,23 +23,26 @@ from neuron import (
     append,
     consolidate,
     dual_hash,
+    emit_receipt,
     energy_estimate,
+    merkle,
     predict_next,
     prune,
     recovery_cost,
     replay,
     salience_decay,
+    StopRule,
 )
 
 
 @pytest.fixture(autouse=True)
 def clean_ledger():
     """Remove test ledger before and after each test."""
-    for path in [TEST_LEDGER, TEST_ARCHIVE]:
+    for path in [TEST_LEDGER, TEST_ARCHIVE, TEST_RECEIPTS]:
         if path.exists():
             path.unlink()
     yield
-    for path in [TEST_LEDGER, TEST_ARCHIVE]:
+    for path in [TEST_LEDGER, TEST_ARCHIVE, TEST_RECEIPTS]:
         if path.exists():
             path.unlink()
 
@@ -308,3 +313,120 @@ class TestIntegration:
 
         # At 120 minutes, should be around 3.5
         assert 3.0 < recovery_cost(120) < 4.0
+
+
+# CLAUDEME §8 Core Function Tests
+class TestEmitReceipt:
+    """Tests for emit_receipt() per CLAUDEME §4."""
+
+    def test_emit_receipt_basic(self):
+        """Test basic receipt emission."""
+        receipt = emit_receipt("test_receipt", {"test_key": "test_value"})
+        assert receipt["type"] == "test_receipt"
+        assert receipt["test_key"] == "test_value"
+        assert "ts" in receipt
+        assert "hash" in receipt
+
+    def test_emit_receipt_has_dual_hash(self):
+        """Test receipt hash is dual format (SHA256:BLAKE3)."""
+        receipt = emit_receipt("hash_test_receipt", {"data": 123})
+        assert ":" in receipt["hash"]
+        parts = receipt["hash"].split(":")
+        assert len(parts) == 2
+        assert len(parts[0]) == 64
+        assert len(parts[1]) == 64
+
+    def test_emit_receipt_timestamp_format(self):
+        """Test receipt timestamp is ISO 8601 format."""
+        receipt = emit_receipt("ts_test_receipt", {})
+        assert "T" in receipt["ts"]
+        assert receipt["ts"].endswith("Z")
+
+
+class TestMerkle:
+    """Tests for merkle() per CLAUDEME §8."""
+
+    def test_merkle_empty_list(self):
+        """Test merkle of empty list."""
+        result = merkle([])
+        assert ":" in result  # Dual hash format
+
+    def test_merkle_single_item(self):
+        """Test merkle of single item."""
+        result = merkle(["single"])
+        assert ":" in result
+        assert len(result.split(":")[0]) == 64
+
+    def test_merkle_multiple_items(self):
+        """Test merkle of multiple items."""
+        result = merkle(["a", "b", "c"])
+        assert ":" in result
+        assert len(result.split(":")[0]) == 64
+
+    def test_merkle_deterministic(self):
+        """Test merkle is deterministic."""
+        items = ["x", "y", "z"]
+        result1 = merkle(items)
+        result2 = merkle(items)
+        assert result1 == result2
+
+    def test_merkle_order_matters(self):
+        """Test merkle changes with item order."""
+        result1 = merkle(["a", "b"])
+        result2 = merkle(["b", "a"])
+        assert result1 != result2
+
+    def test_merkle_with_dicts(self):
+        """Test merkle with dict items."""
+        items = [{"key": "value1"}, {"key": "value2"}]
+        result = merkle(items)
+        assert ":" in result
+
+    def test_merkle_with_bytes(self):
+        """Test merkle with bytes items."""
+        items = [b"bytes1", b"bytes2"]
+        result = merkle(items)
+        assert ":" in result
+
+
+class TestStopRule:
+    """Tests for StopRule exception per CLAUDEME §8."""
+
+    def test_stoprule_is_exception(self):
+        """Test StopRule is an Exception subclass."""
+        assert issubclass(StopRule, Exception)
+
+    def test_stoprule_basic_raise(self):
+        """Test StopRule can be raised and caught."""
+        with pytest.raises(StopRule):
+            raise StopRule("test_rule", "test message")
+
+    def test_stoprule_has_rule_name(self):
+        """Test StopRule stores rule name."""
+        try:
+            raise StopRule("my_rule", "my message")
+        except StopRule as e:
+            assert e.rule_name == "my_rule"
+
+    def test_stoprule_has_context(self):
+        """Test StopRule stores context dict."""
+        ctx = {"key": "value", "count": 42}
+        try:
+            raise StopRule("ctx_rule", "context message", ctx)
+        except StopRule as e:
+            assert e.context == ctx
+
+    def test_stoprule_message_format(self):
+        """Test StopRule message format."""
+        try:
+            raise StopRule("format_rule", "detailed message")
+        except StopRule as e:
+            assert "STOPRULE[format_rule]" in str(e)
+            assert "detailed message" in str(e)
+
+    def test_stoprule_default_context(self):
+        """Test StopRule has empty context by default."""
+        try:
+            raise StopRule("default_rule", "no context")
+        except StopRule as e:
+            assert e.context == {}
