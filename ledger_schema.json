@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NEURON v3 Ledger Entry",
+  "description": "Biologically grounded ledger entry with salience, replay tracking, and cognitive load estimation",
+  "type": "object",
+  "required": ["ts", "project", "task", "next", "hash", "salience", "replay_count", "energy"],
+  "properties": {
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of entry creation"
+    },
+    "project": {
+      "type": "string",
+      "enum": ["agentproof", "axiom", "neuron"],
+      "description": "Project identifier"
+    },
+    "commit": {
+      "type": ["string", "null"],
+      "description": "Git commit hash or null"
+    },
+    "task": {
+      "type": "string",
+      "maxLength": 50,
+      "description": "Current task description (≤50 chars)"
+    },
+    "next": {
+      "type": "string",
+      "maxLength": 50,
+      "description": "Next action description (≤50 chars)"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}:[a-f0-9]{64}$",
+      "description": "SHA256:BLAKE3 dual hash per CLAUDEME §8"
+    },
+    "salience": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 1.0,
+      "description": "Entry importance (0-1), decays over time, increases on replay"
+    },
+    "replay_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Number of times entry was accessed during consolidation"
+    },
+    "energy": {
+      "type": "number",
+      "minimum": 0.5,
+      "maximum": 2.0,
+      "description": "Cognitive load estimate (higher = more complex context)"
+    }
+  },
+  "additionalProperties": false
+}
