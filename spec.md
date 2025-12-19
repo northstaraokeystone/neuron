@@ -1,16 +1,98 @@
-# NEURON v3: Biologically Grounded Ledger
+# NEURON v4: Inference-Integrated Ledger
 
-**State reconstruction inevitable and advantageous.**
+**volatile state + persistent proof = resilient inference**
 
 ## Paradigm Shift
 
-| v2 | v3 |
+| v3 | v4 |
 |----|----|
-| "State loss impossible" | "State reconstruction inevitable" |
-| Infinite append-only ledger | Ledger with synaptic pruning |
-| Linear recovery assumption | Non-linear prefrontal task-set inertia |
-| α = gap/recovery (static) | α with variance tracking |
-| Replay = read last entry | Replay = hippocampal consolidation |
+| Manual append triggers | Inference cycle auto-append |
+| Single project scope | Multi-model ensemble |
+| Ledger as standalone | Ledger as inference complement |
+| Generic entries | Model-aware entries with token_count |
+| Replay returns list | Replay returns context-ready format |
+
+## The Integration Insight
+
+> "volatile state + persistent proof = resilient inference"
+
+Grok's context windows are volatile (cleared between sessions). NEURON ledger is persistent. Together: resilient inference that survives interruption.
+
+## Entry Format
+
+```json
+{
+  "ts": "2025-01-15T14:00:00Z",
+  "project": "agentproof|axiom|neuron",
+  "model": "grok|claude|gemini|neuron",
+  "hash": "sha256:blake3",
+  "commit": "git commit hash or null",
+  "task": "current task (≤50 chars)",
+  "next": "next action (≤50 chars)",
+  "salience": 0.85,
+  "replay_count": 0,
+  "energy": 1.0,
+  "token_count": 4500,
+  "inference_id": "inf_abc123 or null",
+  "context_summary": "compressed context (≤500 chars)"
+}
+```
+
+### New Fields (v4)
+
+| Field | Type | Purpose | Default |
+|-------|------|---------|---------|
+| model | str | Which LLM generated this entry | "neuron" |
+| token_count | int | Context window utilization at append time | 0 |
+| inference_id | str\|null | Unique ID for inference cycle | null |
+| context_summary | str | Compressed snapshot of context (≤500 chars) | "" |
+
+## Functions
+
+### New (v4)
+
+- `inference_append(model, task, next, context_summary, token_count, inference_id)` → Auto-append from LLM inference cycles
+- `replay_to_context(n, format)` → Format ledger for context injection
+- `sync_ledger(remote_path)` → Merge remote ledger (last-write-wins)
+
+### Extended (v4)
+
+- `append(project, task, next, commit, energy, model, token_count, inference_id, context_summary)` → Entry with inference metadata
+- `replay(n, since, increment_replay, format)` → format="list"|"context"
+- `consolidate(top_k, alpha_threshold)` → Weight by token_count
+- `prune(max_age_days, salience_threshold)` → Target >99.5% compression
+
+### Core (unchanged)
+
+- `dual_hash(data)` → SHA256:BLAKE3 per CLAUDEME §8
+- `alpha(threshold_minutes)` → Stats with variance, expert_novice_ratio
+- `recovery_cost(gap_minutes)` → Non-linear cost model
+- `predict_next(n_context)` → Pattern-based prospective memory
+- `salience_decay(entry, current_ts)` → Time + replay decay
+- `energy_estimate(task, next, token_count)` → Cognitive load from text + tokens
+
+## Constants
+
+```python
+# Models
+SUPPORTED_MODELS = ["grok", "claude", "gemini", "neuron"]
+
+# Inference integration
+INFERENCE_CONTEXT_MAX_TOKENS = 128000
+MAX_CONTEXT_SUMMARY_LEN = 500
+
+# Consolidation
+HIGH_ALPHA_THRESHOLD = 10.0
+REPLAY_STRENGTH_FACTOR = 3
+
+# Pruning v3
+SALIENCE_RETENTION_THRESHOLD = 0.8
+PRUNING_V3_TARGET = 0.995
+MIN_AGE_TO_PRUNE_DAYS = 7
+
+# Sync
+SYNC_CONFLICT_RESOLUTION = "last_write_wins"
+```
 
 ## Biological Grounding
 
@@ -20,140 +102,98 @@
 | Synaptic downscaling | Sleep prunes low-salience traces | `prune()` |
 | Task-set inertia | Prefrontal switching cost ~200-500ms baseline | `recovery_cost()` |
 | Prospective memory | Predict upcoming action from context | `predict_next()` |
+| Context reinstatement | Hippocampal pattern completion | `replay_to_context()` |
 
-## Entry Format
-
-```json
-{
-  "ts": "2025-01-15T14:00:00Z",
-  "project": "agentproof|axiom|neuron",
-  "hash": "sha256:blake3",
-  "commit": "git commit hash or null",
-  "task": "current task (≤50 chars)",
-  "next": "next action (≤50 chars)",
-  "salience": 0.85,
-  "replay_count": 0,
-  "energy": 1.0
-}
-```
-
-### New Fields
-
-| Field | Type | Purpose | Default |
-|-------|------|---------|---------|
-| salience | float 0-1 | Entry importance (decays over time, increases on replay) | 1.0 |
-| replay_count | int | Times entry was accessed during consolidation | 0 |
-| energy | float | Cognitive load proxy (higher = more complex context) | 1.0 |
-
-## Functions
-
-### Core (unchanged signature)
-
-- `dual_hash(data)` → SHA256:BLAKE3 per CLAUDEME §8
-
-### Extended
-
-- `append(project, task, next, commit, energy)` → Entry with salience/energy
-- `replay(n, since, increment_replay)` → Entries; optionally bump replay_count
-- `alpha(threshold_minutes)` → Stats with variance, expert_novice_ratio
-
-### New (v3)
-
-- `consolidate(top_k, alpha_threshold)` → Hippocampal replay
-- `prune(max_age_days, salience_threshold)` → Synaptic downscaling
-- `recovery_cost(gap_minutes)` → Non-linear cost model
-- `predict_next(n_context)` → Pattern-based prospective memory
-- `salience_decay(entry, current_ts)` → Time + replay decay
-- `energy_estimate(task, next)` → Cognitive load from text
-
-## Constants
-
-```python
-DECAY_RATE_PER_DAY = 0.05      # 5% base decay
-REPLAY_DECAY_SLOWDOWN = 0.1    # Each replay slows decay 10%
-RECOVERY_K = 4.0               # Maximum additional cost
-RECOVERY_TAU = 120.0           # Time constant (minutes)
-MIN_REPLAY_TO_PRESERVE = 5     # Never prune high-replay entries
-```
-
-## Recovery Cost Model
+## Integration Pattern
 
 ```
-cost = 1.0 + 4.0 * (1 - exp(-gap_minutes / 120.0))
-
-gap = 0 min   → cost = 1.00
-gap = 15 min  → cost = 1.47
-gap = 60 min  → cost = 2.57
-gap = 120 min → cost = 3.53
-gap = 240 min → cost = 4.73
-```
-
-## Salience Decay Model
-
-```
-age_days = (now - entry_ts).days
-replay_boost = 1 + 0.1 * replay_count
-decayed = salience * exp(-0.05 * age_days / replay_boost)
-```
-
-After 30 days:
-- No replays: salience ≈ 0.22
-- 5 replays: salience ≈ 0.47
-
-## Entry Lifecycle
-
-```
-Day 0:  append()      → salience=1.0, replay_count=0
-Day 3:  replay(+inc)  → replay_count=1, decay slowed
-Day 7:  consolidate() → salience boosted (high-α)
-Day 30: prune check   → salience=0.35, kept
-Day 90: prune check   → salience=0.05, archived
-```
-
-## Calibration Sources
-
-| Mechanism | Source | Finding |
-|-----------|--------|---------|
-| Sharp-wave ripples | Wilson & McNaughton 1994 | 10-20x faster offline replay |
-| Synaptic downscaling | Tononi & Cirelli 2014 | Sleep prunes low-salience |
-| Task-set inertia | Monsell 2003 | 200-500ms switch cost baseline |
-| Memory-for-goals | Altmann & Trafton 2002 | Non-linear decay |
-| Expertise | Ericsson 2006 | 5-10x expert/novice ratio |
-
-## Files
-
-```
-neuron/
-├── receipts.jsonl       # Active ledger
-├── archive.jsonl        # Pruned entries (cold storage)
-├── neuron.py            # ~140 lines
-├── ledger_schema.json   # JSON schema
-├── spec.md              # This file
-└── tests/
-    └── test_neuron.py
+┌─────────────────────────────────────────────────────────────────┐
+│                        INFERENCE LAYER                          │
+│                                                                 │
+│   ┌─────────┐     ┌─────────┐     ┌─────────┐                  │
+│   │  GROK   │     │ CLAUDE  │     │ GEMINI  │                  │
+│   │ context │     │ context │     │ context │                  │
+│   │ window  │     │ window  │     │ window  │                  │
+│   └────┬────┘     └────┬────┘     └────┬────┘                  │
+│        │               │               │                        │
+│        └───────────────┼───────────────┘                        │
+│                        │                                        │
+│                        ▼                                        │
+│              inference_append()                                 │
+│                        │                                        │
+└────────────────────────┼────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    NEURON LEDGER                                │
+│                                                                 │
+│  receipts.jsonl                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│  {"model":"grok", "task":"...", "token_count":45000, ...}      │
+│  {"model":"claude", "task":"...", "token_count":25000, ...}    │
+│                                                                 │
+│  replay_to_context() → formatted string for any model          │
+│  sync_ledger() → merge across instances                         │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Usage
 
 ```python
-from neuron import append, replay, consolidate, prune, predict_next
+from neuron import inference_append, replay_to_context, sync_ledger
 
-# Work session
-append("neuron", "implement federation", "write tests", "abc123")
+# Inference cycle append
+inference_append(
+    model="grok",
+    task="reasoning about Mars colony",
+    next="calculate entropy budget",
+    context_summary="User asked about Mars colony survival...",
+    token_count=45000,
+    inference_id="inf_abc123"
+)
 
-# End of session: consolidate
-consolidate(top_k=10, alpha_threshold=5.0)
+# Resume with context injection
+context = replay_to_context(n=5, format="context")
+# Inject into LLM prompt
 
-# Resume: replay with strengthening
-last = replay(1, increment_replay=True)[0]
+# Sync with remote instance
+sync_ledger("/path/to/remote/receipts.jsonl")
+```
 
-# Weekly: prune
-prune(max_age_days=30, salience_threshold=0.1)
+## Files
 
-# Predict
-suggestion = predict_next(n_context=5)
+```
+neuron/
+├── receipts.jsonl       # Active ledger (extended schema)
+├── archive.jsonl        # Pruned entries (cold storage)
+├── neuron.py            # ~180 lines
+├── ledger_schema.json   # JSON schema (v4)
+├── spec.md              # This file
+└── tests/
+    ├── test_neuron.py
+    └── test_inference.py
+```
+
+## Recovery Flow
+
+```
+Session ends → context window cleared (volatile)
+                    ↓
+New session → replay_to_context(5)
+                    ↓
+NEURON returns formatted state:
+  ## NEURON State Recovery
+  ### Recent Context (5 entries)
+  [ts] grok: Task: X, Next: Y, Context: Z
+  ...
+  ### Resume Instruction
+  Continue from: Y
+                    ↓
+LLM resumes with full context (persistent)
 ```
 
 ---
 
-**~140 lines. Biologically grounded. Reconstruction > perfection.**
+**~180 lines. Multi-model. Inference-native.**
+
+**volatile state + persistent proof = resilient inference**

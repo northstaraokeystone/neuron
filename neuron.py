@@ -1,13 +1,14 @@
 """
-NEURON v3: Biologically Grounded Ledger
-State reconstruction inevitable and advantageous.
-~140 lines. Sharp-wave ripples. Synaptic pruning. Task-set inertia.
+NEURON v4: Inference-Integrated Ledger
+volatile state + persistent proof = resilient inference
+~180 lines. Multi-model. Inference-native.
 """
 
 import hashlib
 import json
 import math
 import os
+import uuid
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,12 +23,17 @@ except ImportError:
 LEDGER_PATH = Path(os.environ.get("NEURON_LEDGER", Path.home() / "neuron" / "receipts.jsonl"))
 ARCHIVE_PATH = Path(os.environ.get("NEURON_ARCHIVE", Path.home() / "neuron" / "archive.jsonl"))
 
-# Allowed projects
+# Projects and Models
 ALLOWED_PROJECTS = ["agentproof", "axiom", "neuron"]
+SUPPORTED_MODELS = ["grok", "claude", "gemini", "neuron"]
 
 # Entry constraints
 MAX_TASK_LEN = 50
 MAX_NEXT_LEN = 50
+MAX_CONTEXT_SUMMARY_LEN = 500
+
+# Inference integration
+INFERENCE_CONTEXT_MAX_TOKENS = 128000
 
 # Gap detection
 DEFAULT_GAP_THRESHOLD_MIN = 60
@@ -43,12 +49,20 @@ RECOVERY_TAU = 120.0
 # Consolidation
 DEFAULT_CONSOLIDATE_TOP_K = 10
 DEFAULT_ALPHA_THRESHOLD = 5.0
+HIGH_ALPHA_THRESHOLD = 10.0
+REPLAY_STRENGTH_FACTOR = 3
 SALIENCE_BOOST_BASE = 0.1
 
-# Pruning
+# Pruning v3
 DEFAULT_MAX_AGE_DAYS = 30
 DEFAULT_SALIENCE_THRESHOLD = 0.1
+SALIENCE_RETENTION_THRESHOLD = 0.8
+PRUNING_V3_TARGET = 0.995
 MIN_REPLAY_TO_PRESERVE = 5
+MIN_AGE_TO_PRUNE_DAYS = 7
+
+# Sync
+SYNC_CONFLICT_RESOLUTION = "last_write_wins"
 
 # Energy estimation
 TECHNICAL_TERMS = ["federation", "merkle", "entropy", "kan", "spline",
@@ -64,13 +78,17 @@ def dual_hash(data: bytes | str) -> str:
     return f"{sha256_hex}:{blake3_hex}"
 
 
-def energy_estimate(task: str, next_action: str) -> float:
-    """Estimate cognitive load from text complexity."""
+def energy_estimate(task: str, next_action: str, token_count: int = 0) -> float:
+    """Estimate cognitive load from text complexity and token count."""
     words = len(task.split()) + len(next_action.split())
     word_factor = 0.5 + (words / 20)
     tech_count = sum(1 for t in TECHNICAL_TERMS if t in task.lower() or t in next_action.lower())
     tech_factor = 1.0 + 0.1 * tech_count
-    return min(2.0, max(0.5, word_factor * tech_factor))
+    base_energy = word_factor * tech_factor
+    if token_count > 0:
+        token_factor = 0.5 + (token_count / INFERENCE_CONTEXT_MAX_TOKENS) * 1.5
+        base_energy = (base_energy + token_factor) / 2
+    return min(2.0, max(0.5, base_energy))
 
 
 def salience_decay(entry: dict, current_ts: datetime | None = None) -> float:
@@ -89,21 +107,41 @@ def recovery_cost(gap_minutes: float) -> float:
     return 1.0 + RECOVERY_K * (1 - math.exp(-gap_minutes / RECOVERY_TAU))
 
 
-def append(project: str, task: str, next_action: str, commit: str | None = None, energy: float | None = None) -> dict:
-    """Append entry to shared ledger with salience/energy."""
+def append(project: str, task: str, next_action: str, commit: str | None = None, energy: float | None = None,
+           model: str = "neuron", token_count: int = 0, inference_id: str | None = None, context_summary: str = "") -> dict:
+    """Append entry to shared ledger with salience/energy and optional inference metadata."""
     if project not in ALLOWED_PROJECTS:
         raise ValueError(f"Project must be one of: {ALLOWED_PROJECTS}")
+    if model not in SUPPORTED_MODELS:
+        raise ValueError(f"Model must be one of: {SUPPORTED_MODELS}")
     task, next_action = task[:MAX_TASK_LEN], next_action[:MAX_NEXT_LEN]
+    context_summary = context_summary[:MAX_CONTEXT_SUMMARY_LEN]
     entry = {
         "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "project": project, "commit": commit, "task": task, "next": next_action,
-        "salience": 1.0, "replay_count": 0, "energy": energy if energy else energy_estimate(task, next_action)
+        "project": project, "model": model, "commit": commit, "task": task, "next": next_action,
+        "salience": 1.0, "replay_count": 0,
+        "energy": energy if energy else energy_estimate(task, next_action, token_count),
+        "token_count": token_count, "inference_id": inference_id, "context_summary": context_summary
     }
     entry["hash"] = dual_hash(json.dumps({k: v for k, v in entry.items() if k != "hash"}, sort_keys=True))
     LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(LEDGER_PATH, "a") as f:
         f.write(json.dumps(entry) + "\n")
     return entry
+
+
+def inference_append(model: str, task: str, next_action: str, context_summary: str,
+                     token_count: int, inference_id: str | None = None) -> dict:
+    """Auto-append from LLM inference cycles with full context metadata."""
+    if model not in SUPPORTED_MODELS:
+        raise ValueError(f"Model must be one of: {SUPPORTED_MODELS}")
+    if inference_id is None:
+        inference_id = f"inf_{uuid.uuid4().hex[:12]}"
+    return append(
+        project="neuron", task=task, next_action=next_action, commit=None,
+        model=model, token_count=token_count, inference_id=inference_id,
+        context_summary=context_summary[:MAX_CONTEXT_SUMMARY_LEN]
+    )
 
 
 def _read_ledger() -> list[dict]:
@@ -129,7 +167,34 @@ def _write_ledger(entries: list[dict]) -> None:
             f.write(json.dumps(e) + "\n")
 
 
-def replay(n: int | None = 10, since: str | None = None, increment_replay: bool = False) -> list[dict]:
+def replay_to_context(n: int = 10, format: str = "context") -> str:
+    """Return ledger entries formatted for LLM context injection."""
+    entries = replay(n=n, increment_replay=True)
+    if not entries:
+        return "## NEURON State Recovery\n\nNo entries available."
+
+    lines = ["## NEURON State Recovery", f"\n### Recent Context ({len(entries)} entries)\n"]
+    for e in entries:
+        model = e.get("model", "neuron")
+        ts = e.get("ts", "unknown")
+        task = e.get("task", "")
+        next_action = e.get("next", "")
+        ctx = e.get("context_summary", "")
+        lines.append(f"[{ts}] {model}")
+        lines.append(f"Task: {task}")
+        lines.append(f"Next: {next_action}")
+        if ctx:
+            lines.append(f"Context: {ctx}")
+        lines.append("")
+
+    if entries:
+        lines.append("### Resume Instruction")
+        lines.append(f"Continue from: {entries[-1].get('next', 'unknown')}")
+
+    return "\n".join(lines)
+
+
+def replay(n: int | None = 10, since: str | None = None, increment_replay: bool = False, format: str = "list") -> list[dict] | str:
     """Get entries, optionally increment replay_count (simulates neural reactivation)."""
     entries = _read_ledger()
     if since:
@@ -143,7 +208,62 @@ def replay(n: int | None = 10, since: str | None = None, increment_replay: bool 
                 e["replay_count"] = e.get("replay_count", 0) + 1
         _write_ledger(all_entries)
         result = [e for e in all_entries if e.get("hash") in result_hashes][-n:] if n else [e for e in all_entries if e.get("hash") in result_hashes]
+
+    if format == "context":
+        return replay_to_context(n=n)
     return result
+
+
+def sync_ledger(remote_path: str) -> dict:
+    """Merge remote ledger with local using last-write-wins."""
+    local_entries = _read_ledger()
+    remote_entries = []
+    remote_path = Path(remote_path).expanduser()
+
+    if remote_path.exists():
+        with open(remote_path, "r") as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        remote_entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+
+    local_by_hash = {e.get("hash"): e for e in local_entries}
+    local_by_inf_id = {e.get("inference_id"): e for e in local_entries if e.get("inference_id")}
+
+    conflicts_resolved = 0
+    for re in remote_entries:
+        rhash = re.get("hash")
+        rinf_id = re.get("inference_id")
+
+        if rhash in local_by_hash:
+            continue
+
+        if rinf_id and rinf_id in local_by_inf_id:
+            local_e = local_by_inf_id[rinf_id]
+            if re.get("ts", "") > local_e.get("ts", ""):
+                local_by_hash[local_e["hash"]] = None
+                local_by_hash[rhash] = re
+                local_by_inf_id[rinf_id] = re
+                conflicts_resolved += 1
+        else:
+            local_by_hash[rhash] = re
+            if rinf_id:
+                local_by_inf_id[rinf_id] = re
+
+    merged = [e for e in local_by_hash.values() if e is not None]
+    merged.sort(key=lambda x: x.get("ts", ""))
+    _write_ledger(merged)
+
+    return {
+        "local_entries": len(local_entries),
+        "remote_entries": len(remote_entries),
+        "merged_entries": len(merged),
+        "conflicts_resolved": conflicts_resolved,
+        "resolution_strategy": SYNC_CONFLICT_RESOLUTION,
+        "sync_ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    }
 
 
 def alpha(threshold_minutes: int = DEFAULT_GAP_THRESHOLD_MIN) -> dict:
@@ -176,7 +296,7 @@ def alpha(threshold_minutes: int = DEFAULT_GAP_THRESHOLD_MIN) -> dict:
 
 
 def consolidate(top_k: int = DEFAULT_CONSOLIDATE_TOP_K, alpha_threshold: float = DEFAULT_ALPHA_THRESHOLD) -> dict:
-    """Hippocampal replay: strengthen high-α entries (Wilson & McNaughton 1994)."""
+    """Hippocampal replay: strengthen high-α entries with token_count weighting (Wilson & McNaughton 1994)."""
     entries = _read_ledger()
     stats = alpha(threshold_minutes=1)
     qualifying = [(g, g["alpha"]) for g in stats["gaps"] if g["alpha"] > alpha_threshold]
@@ -186,33 +306,58 @@ def consolidate(top_k: int = DEFAULT_CONSOLIDATE_TOP_K, alpha_threshold: float =
         for e in entries:
             if e.get("ts") == gap["end"]:
                 old_sal = e.get("salience", 1.0)
-                e["salience"] = min(1.0, old_sal + SALIENCE_BOOST_BASE * math.log(max(1, a)))
+                token_weight = 1 + e.get("token_count", 0) / INFERENCE_CONTEXT_MAX_TOKENS
+                e["salience"] = min(1.0, old_sal + SALIENCE_BOOST_BASE * math.log(max(1, a)) * token_weight)
                 boost += e["salience"] - old_sal
+                if a > HIGH_ALPHA_THRESHOLD:
+                    e["replay_count"] = e.get("replay_count", 0) + REPLAY_STRENGTH_FACTOR
                 affected_hashes.append(e.get("hash", "")[:16])
     _write_ledger(entries)
     return {"consolidated_count": len(affected_hashes), "salience_boost": round(boost, 3), "entries_affected": affected_hashes}
 
 
 def prune(max_age_days: int = DEFAULT_MAX_AGE_DAYS, salience_threshold: float = DEFAULT_SALIENCE_THRESHOLD) -> dict:
-    """Synaptic downscaling: archive low-salience entries (Tononi & Cirelli 2014)."""
+    """Synaptic downscaling: archive low-salience entries targeting >99.5% compression (Tononi & Cirelli 2014)."""
     entries = _read_ledger()
+    if not entries:
+        return {"pruned_count": 0, "archived_to": str(ARCHIVE_PATH), "ledger_size_before": 0,
+                "ledger_size_after": 0, "compression_ratio": 0.0}
+
     now = datetime.now(timezone.utc)
     keep, archive = [], []
     for e in entries:
         decayed = salience_decay(e, now)
         entry_ts = datetime.fromisoformat(e["ts"].replace("Z", "+00:00"))
         age_days = (now - entry_ts).total_seconds() / 86400
-        if age_days > max_age_days and decayed < salience_threshold and e.get("replay_count", 0) < MIN_REPLAY_TO_PRESERVE:
-            archive.append(e)
-        else:
+
+        preserve = (
+            age_days < MIN_AGE_TO_PRUNE_DAYS or
+            e.get("replay_count", 0) >= MIN_REPLAY_TO_PRESERVE or
+            decayed >= SALIENCE_RETENTION_THRESHOLD
+        )
+
+        if preserve or (age_days <= max_age_days or decayed >= salience_threshold):
             keep.append(e)
+        else:
+            archive.append(e)
+
     if archive:
         ARCHIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(ARCHIVE_PATH, "a") as f:
             for e in archive:
                 f.write(json.dumps(e) + "\n")
+
     _write_ledger(keep)
-    return {"pruned_count": len(archive), "archived_to": str(ARCHIVE_PATH), "ledger_size_before": len(entries), "ledger_size_after": len(keep)}
+    compression_ratio = len(archive) / len(entries) if entries else 0.0
+
+    return {
+        "pruned_count": len(archive),
+        "archived_to": str(ARCHIVE_PATH),
+        "ledger_size_before": len(entries),
+        "ledger_size_after": len(keep),
+        "compression_ratio": round(compression_ratio, 4),
+        "salience_preserved": sum(1 for e in keep if salience_decay(e, now) >= SALIENCE_RETENTION_THRESHOLD)
+    }
 
 
 def predict_next(n_context: int = 5) -> str | None:
@@ -231,5 +376,6 @@ def predict_next(n_context: int = 5) -> str | None:
 
 
 if __name__ == "__main__":
-    print(f"NEURON v3 - Ledger: {LEDGER_PATH}")
+    print(f"NEURON v4 - Ledger: {LEDGER_PATH}")
     print(f"BLAKE3 available: {HAS_BLAKE3}")
+    print(f"Supported models: {SUPPORTED_MODELS}")
