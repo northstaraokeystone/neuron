@@ -55,9 +55,12 @@ HIGH_STRESS_ENTRIES = 10_000_000
 HIGH_STRESS_WORKERS = 16
 HIGH_STRESS_OVERHEAD_MAX = 0.01
 
-# Receipt storage
-STRESS_RECEIPTS_PATH = Path(os.environ.get("NEURON_STRESS_RECEIPTS",
-                                            Path.home() / "neuron" / "stress_receipts.jsonl"))
+# Receipt storage - use function for lazy evaluation (test compatibility)
+def _get_stress_receipts_path() -> Path:
+    return Path(os.environ.get("NEURON_STRESS_RECEIPTS",
+                               Path.home() / "neuron" / "stress_receipts.jsonl"))
+
+STRESS_RECEIPTS_PATH = _get_stress_receipts_path()
 
 
 def _emit_receipt(receipt_type: str, data: dict) -> dict:
@@ -68,8 +71,9 @@ def _emit_receipt(receipt_type: str, data: dict) -> dict:
         **data
     }
     receipt["hash"] = dual_hash(json.dumps({k: v for k, v in receipt.items() if k != "hash"}, sort_keys=True))
-    STRESS_RECEIPTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(STRESS_RECEIPTS_PATH, "a") as f:
+    receipts_path = _get_stress_receipts_path()
+    receipts_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(receipts_path, "a") as f:
         f.write(json.dumps(receipt) + "\n")
     return receipt
 
@@ -314,8 +318,7 @@ def concurrent_sync_test(n_workers: int = 4, n_entries_each: int = 100) -> dict:
     shared_ledger = Path(temp_dir) / "shared_receipts.jsonl"
     worker_ledgers = [Path(temp_dir) / f"worker_{i}_receipts.jsonl" for i in range(n_workers)]
 
-    import neuron
-    original_ledger = neuron.LEDGER_PATH
+    original_ledger_env = os.environ.get("NEURON_LEDGER", "")
 
     conflicts_detected = 0
     lock = threading.Lock()
@@ -334,13 +337,13 @@ def concurrent_sync_test(n_workers: int = 4, n_entries_each: int = 100) -> dict:
 
             # Sync to shared
             with lock:
-                neuron.LEDGER_PATH = worker_ledger
+                os.environ["NEURON_LEDGER"] = str(worker_ledger)
                 if shared_ledger.exists():
                     result = sync_ledger(str(shared_ledger))
                     conflicts_detected += result.get("conflicts_resolved", 0)
 
                 local_entries = _read_ledger()
-                neuron.LEDGER_PATH = shared_ledger
+                os.environ["NEURON_LEDGER"] = str(shared_ledger)
                 if shared_ledger.exists():
                     existing = _read_ledger()
                     seen_hashes = {e.get("hash") for e in existing}
@@ -361,7 +364,7 @@ def concurrent_sync_test(n_workers: int = 4, n_entries_each: int = 100) -> dict:
 
         total_time = time.perf_counter() - start_time
 
-        neuron.LEDGER_PATH = shared_ledger
+        os.environ["NEURON_LEDGER"] = str(shared_ledger)
         final_entries = _read_ledger() if shared_ledger.exists() else []
         final_hash = dual_hash(json.dumps([e.get("hash") for e in final_entries[:10]], sort_keys=True))
 
@@ -386,7 +389,7 @@ def concurrent_sync_test(n_workers: int = 4, n_entries_each: int = 100) -> dict:
         return result
 
     finally:
-        neuron.LEDGER_PATH = original_ledger
+        os.environ["NEURON_LEDGER"] = original_ledger_env
         for p in [shared_ledger] + worker_ledgers:
             if p.exists():
                 p.unlink()

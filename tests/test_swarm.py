@@ -28,17 +28,24 @@ from stress import (
     SWARM_CONFLICT_THRESHOLD,
     HIGH_STRESS_APPEND_TARGET,
     HIGH_STRESS_WORKERS,
+    _get_stress_receipts_path,
 )
+
+
+def get_test_stress_receipts_path():
+    """Get the actual stress receipts path being used by the module."""
+    return _get_stress_receipts_path()
 
 
 @pytest.fixture(autouse=True)
 def clean_test_files():
     """Remove test files before and after each test."""
-    for path in [TEST_LEDGER, TEST_ARCHIVE, TEST_STRESS_RECEIPTS]:
+    paths = [TEST_LEDGER, TEST_ARCHIVE, get_test_stress_receipts_path()]
+    for path in paths:
         if path.exists():
             path.unlink()
     yield
-    for path in [TEST_LEDGER, TEST_ARCHIVE, TEST_STRESS_RECEIPTS]:
+    for path in paths:
         if path.exists():
             path.unlink()
 
@@ -92,8 +99,9 @@ class TestSwarmTest:
         """Test swarm_test emits a receipt."""
         swarm_test(n_agents=2, appends_per_agent=2, shard_count=2)
 
-        assert TEST_STRESS_RECEIPTS.exists()
-        with open(TEST_STRESS_RECEIPTS) as f:
+        receipts_path = get_test_stress_receipts_path()
+        assert receipts_path.exists()
+        with open(receipts_path) as f:
             content = f.read()
         assert "swarm_test_receipt" in content
 
@@ -156,8 +164,9 @@ class TestHighStressTest:
         """Test high_stress_test emits a receipt."""
         high_stress_test(n_entries=50, shard_count=2, workers=2)
 
-        assert TEST_STRESS_RECEIPTS.exists()
-        with open(TEST_STRESS_RECEIPTS) as f:
+        receipts_path = get_test_stress_receipts_path()
+        assert receipts_path.exists()
+        with open(receipts_path) as f:
             content = f.read()
         assert "high_stress_receipt" in content
 

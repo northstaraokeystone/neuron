@@ -20,9 +20,16 @@ try:
 except ImportError:
     HAS_BLAKE3 = False
 
-# Ledger paths
-LEDGER_PATH = Path(os.environ.get("NEURON_LEDGER", Path.home() / "neuron" / "receipts.jsonl"))
-ARCHIVE_PATH = Path(os.environ.get("NEURON_ARCHIVE", Path.home() / "neuron" / "archive.jsonl"))
+# Ledger paths - use functions for lazy evaluation (test compatibility)
+def _get_ledger_path() -> Path:
+    return Path(os.environ.get("NEURON_LEDGER", Path.home() / "neuron" / "receipts.jsonl"))
+
+def _get_archive_path() -> Path:
+    return Path(os.environ.get("NEURON_ARCHIVE", Path.home() / "neuron" / "archive.jsonl"))
+
+# Default paths (can be overridden by tests)
+LEDGER_PATH = _get_ledger_path()
+ARCHIVE_PATH = _get_archive_path()
 
 # Projects and Models
 ALLOWED_PROJECTS = ["agentproof", "axiom", "neuron"]
@@ -189,8 +196,11 @@ def merkle(items: list) -> str:
     return hashes[0]
 
 
-# Receipt storage path
-RECEIPTS_PATH = Path(os.environ.get("NEURON_RECEIPTS", Path.home() / "neuron" / "receipts.jsonl"))
+# Receipt storage path - use function for lazy evaluation (test compatibility)
+def _get_receipts_path() -> Path:
+    return Path(os.environ.get("NEURON_RECEIPTS", Path.home() / "neuron" / "receipts.jsonl"))
+
+RECEIPTS_PATH = _get_receipts_path()
 
 
 def emit_receipt(receipt_type: str, data: dict) -> dict:
@@ -216,8 +226,9 @@ def emit_receipt(receipt_type: str, data: dict) -> dict:
     receipt["hash"] = dual_hash(json.dumps({k: v for k, v in receipt.items() if k != "hash"}, sort_keys=True))
 
     try:
-        RECEIPTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(RECEIPTS_PATH, "a") as f:
+        receipts_path = _get_receipts_path()
+        receipts_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(receipts_path, "a") as f:
             f.write(json.dumps(receipt) + "\n")
     except Exception as e:
         raise StopRule("receipt_emission", f"Failed to emit receipt: {e}", {"receipt_type": receipt_type})
@@ -296,8 +307,9 @@ def append(project: str, task: str, next_action: str, commit: str | None = None,
         "token_count": token_count, "inference_id": inference_id, "context_summary": context_summary
     }
     entry["hash"] = dual_hash(json.dumps({k: v for k, v in entry.items() if k != "hash"}, sort_keys=True))
-    LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(LEDGER_PATH, "a") as f:
+    ledger_path = _get_ledger_path()
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(ledger_path, "a") as f:
         f.write(json.dumps(entry) + "\n")
     return entry
 
@@ -318,10 +330,11 @@ def inference_append(model: str, task: str, next_action: str, context_summary: s
 
 def _read_ledger() -> list[dict]:
     """Read all entries from ledger."""
-    if not LEDGER_PATH.exists():
+    ledger_path = _get_ledger_path()
+    if not ledger_path.exists():
         return []
     entries = []
-    with open(LEDGER_PATH, "r") as f:
+    with open(ledger_path, "r") as f:
         for line in f:
             if line.strip():
                 try:
@@ -333,8 +346,9 @@ def _read_ledger() -> list[dict]:
 
 def _write_ledger(entries: list[dict]) -> None:
     """Write entries to ledger (atomic overwrite)."""
-    LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(LEDGER_PATH, "w") as f:
+    ledger_path = _get_ledger_path()
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(ledger_path, "w") as f:
         for e in entries:
             f.write(json.dumps(e) + "\n")
 
@@ -510,8 +524,9 @@ def consolidate(top_k: int = DEFAULT_CONSOLIDATE_TOP_K, alpha_threshold: float =
 def prune(max_age_days: int = DEFAULT_MAX_AGE_DAYS, salience_threshold: float = DEFAULT_SALIENCE_THRESHOLD) -> dict:
     """Synaptic downscaling: archive low-salience entries targeting >99.5% compression (Tononi & Cirelli 2014)."""
     entries = _read_ledger()
+    archive_path = _get_archive_path()
     if not entries:
-        return {"pruned_count": 0, "archived_to": str(ARCHIVE_PATH), "ledger_size_before": 0,
+        return {"pruned_count": 0, "archived_to": str(archive_path), "ledger_size_before": 0,
                 "ledger_size_after": 0, "compression_ratio": 0.0}
 
     now = datetime.now(timezone.utc)
@@ -533,8 +548,8 @@ def prune(max_age_days: int = DEFAULT_MAX_AGE_DAYS, salience_threshold: float = 
             archive.append(e)
 
     if archive:
-        ARCHIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(ARCHIVE_PATH, "a") as f:
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(archive_path, "a") as f:
             for e in archive:
                 f.write(json.dumps(e) + "\n")
 
@@ -543,7 +558,7 @@ def prune(max_age_days: int = DEFAULT_MAX_AGE_DAYS, salience_threshold: float = 
 
     return {
         "pruned_count": len(archive),
-        "archived_to": str(ARCHIVE_PATH),
+        "archived_to": str(archive_path),
         "ledger_size_before": len(entries),
         "ledger_size_after": len(keep),
         "compression_ratio": round(compression_ratio, 4),

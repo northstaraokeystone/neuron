@@ -295,14 +295,15 @@ class ShardedLedger:
 
 def _emit_shard_receipt(receipt_type: str, data: dict) -> dict:
     """Emit a sharding receipt."""
-    from stress import STRESS_RECEIPTS_PATH
+    from stress import _get_stress_receipts_path
     receipt = {
         "type": receipt_type,
         "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         **data
     }
     receipt["hash"] = _dual_hash(json.dumps({k: v for k, v in receipt.items() if k != "hash"}, sort_keys=True))
-    STRESS_RECEIPTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(STRESS_RECEIPTS_PATH, "a") as f:
+    receipts_path = _get_stress_receipts_path()
+    receipts_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(receipts_path, "a") as f:
         f.write(json.dumps(receipt) + "\n")
     return receipt
