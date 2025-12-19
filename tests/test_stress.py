@@ -25,6 +25,7 @@ from stress import (
     concurrent_sync_test,
     benchmark_report,
     _emit_receipt,
+    _get_stress_receipts_path,
 )
 from neuron import (
     STRESS_TEST_THROUGHPUT_FLOOR,
@@ -33,14 +34,20 @@ from neuron import (
 )
 
 
+def get_test_stress_receipts_path():
+    """Get the actual stress receipts path being used by the module."""
+    return _get_stress_receipts_path()
+
+
 @pytest.fixture(autouse=True)
 def clean_test_files():
     """Remove test files before and after each test."""
-    for path in [TEST_LEDGER, TEST_ARCHIVE, TEST_STRESS_RECEIPTS]:
+    paths = [TEST_LEDGER, TEST_ARCHIVE, get_test_stress_receipts_path()]
+    for path in paths:
         if path.exists():
             path.unlink()
     yield
-    for path in [TEST_LEDGER, TEST_ARCHIVE, TEST_STRESS_RECEIPTS]:
+    for path in paths:
         if path.exists():
             path.unlink()
 
@@ -86,8 +93,9 @@ class TestStressTest:
         """Test that stress_test emits a receipt."""
         stress_test(n_entries=50, concurrent=1)
 
-        assert TEST_STRESS_RECEIPTS.exists()
-        with open(TEST_STRESS_RECEIPTS) as f:
+        receipts_path = get_test_stress_receipts_path()
+        assert receipts_path.exists()
+        with open(receipts_path) as f:
             lines = f.readlines()
         assert len(lines) >= 1
 
@@ -123,8 +131,9 @@ class TestConcurrentSyncTest:
         """Test that concurrent_sync_test emits a receipt."""
         concurrent_sync_test(n_workers=2, n_entries_each=10)
 
-        assert TEST_STRESS_RECEIPTS.exists()
-        with open(TEST_STRESS_RECEIPTS) as f:
+        receipts_path = get_test_stress_receipts_path()
+        assert receipts_path.exists()
+        with open(receipts_path) as f:
             content = f.read()
         assert "concurrent_sync_receipt" in content
 
@@ -181,8 +190,9 @@ class TestBenchmarkReport:
         """Test that benchmark_report emits a receipt."""
         benchmark_report()
 
-        assert TEST_STRESS_RECEIPTS.exists()
-        with open(TEST_STRESS_RECEIPTS) as f:
+        receipts_path = get_test_stress_receipts_path()
+        assert receipts_path.exists()
+        with open(receipts_path) as f:
             content = f.read()
         assert "benchmark_report_receipt" in content
 
@@ -192,7 +202,8 @@ class TestReceiptEmission:
         """Test _emit_receipt creates the receipts file."""
         _emit_receipt("test_receipt", {"test_field": "test_value"})
 
-        assert TEST_STRESS_RECEIPTS.exists()
+        receipts_path = get_test_stress_receipts_path()
+        assert receipts_path.exists()
 
     def test_emit_receipt_includes_hash(self):
         """Test emitted receipts include hash."""
@@ -200,7 +211,8 @@ class TestReceiptEmission:
 
         _emit_receipt("test_receipt", {"data": 123})
 
-        with open(TEST_STRESS_RECEIPTS) as f:
+        receipts_path = get_test_stress_receipts_path()
+        with open(receipts_path) as f:
             receipt = json.loads(f.readline())
 
         assert "hash" in receipt
@@ -212,7 +224,8 @@ class TestReceiptEmission:
 
         _emit_receipt("test_receipt", {"data": 456})
 
-        with open(TEST_STRESS_RECEIPTS) as f:
+        receipts_path = get_test_stress_receipts_path()
+        with open(receipts_path) as f:
             receipt = json.loads(f.readline())
 
         assert "ts" in receipt

@@ -32,17 +32,21 @@ from neuron import (
     replay,
     salience_decay,
     StopRule,
+    _get_ledger_path,
+    _get_archive_path,
+    _get_receipts_path,
 )
 
 
 @pytest.fixture(autouse=True)
 def clean_ledger():
-    """Remove test ledger before and after each test."""
-    for path in [TEST_LEDGER, TEST_ARCHIVE, TEST_RECEIPTS]:
+    """Remove test ledger before and after each test using actual paths."""
+    paths = [_get_ledger_path(), _get_archive_path(), _get_receipts_path()]
+    for path in paths:
         if path.exists():
             path.unlink()
     yield
-    for path in [TEST_LEDGER, TEST_ARCHIVE, TEST_RECEIPTS]:
+    for path in paths:
         if path.exists():
             path.unlink()
 
@@ -158,7 +162,7 @@ class TestAppend:
 
     def test_ledger_file_created(self):
         append("neuron", "task", "next", None)
-        assert TEST_LEDGER.exists()
+        assert _get_ledger_path().exists()
 
 
 class TestReplay:

@@ -1,6 +1,10 @@
 """
 NEURON Test Configuration - CLAUDEME Compliant
 Shared fixtures and configuration for all tests.
+
+NOTE: Environment variables are set by individual test files before importing modules.
+This conftest only provides helpers and markers, not global env setup, to avoid
+conflicts with test-file-specific paths.
 """
 
 import json
@@ -12,36 +16,15 @@ from pathlib import Path
 import pytest
 
 
-# Create temp paths for test isolation
-@pytest.fixture(scope="session", autouse=True)
-def setup_test_environment():
-    """Configure test environment with isolated ledger paths."""
-    temp_dir = tempfile.mkdtemp(prefix="neuron_test_")
-
-    os.environ["NEURON_LEDGER"] = str(Path(temp_dir) / "test_receipts.jsonl")
-    os.environ["NEURON_ARCHIVE"] = str(Path(temp_dir) / "test_archive.jsonl")
-    os.environ["NEURON_RECEIPTS"] = str(Path(temp_dir) / "test_emit_receipts.jsonl")
-    os.environ["NEURON_STRESS_RECEIPTS"] = str(Path(temp_dir) / "test_stress_receipts.jsonl")
-
-    yield temp_dir
-
-    # Cleanup
-    for f in Path(temp_dir).glob("*.jsonl"):
-        try:
-            f.unlink()
-        except Exception:
-            pass
-
-
 @pytest.fixture
-def clean_ledger(setup_test_environment):
-    """Clean ledger files before and after each test."""
-    temp_dir = setup_test_environment
+def clean_ledger():
+    """Clean ledger files before and after each test using current env paths."""
+    from neuron import _get_ledger_path, _get_archive_path, _get_receipts_path
+
     ledger_files = [
-        Path(temp_dir) / "test_receipts.jsonl",
-        Path(temp_dir) / "test_archive.jsonl",
-        Path(temp_dir) / "test_emit_receipts.jsonl",
-        Path(temp_dir) / "test_stress_receipts.jsonl",
+        _get_ledger_path(),
+        _get_archive_path(),
+        _get_receipts_path(),
     ]
 
     for path in ledger_files:

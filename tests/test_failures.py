@@ -20,18 +20,24 @@ os.environ["NEURON_STRESS_RECEIPTS"] = str(TEST_STRESS_RECEIPTS)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from stress import inject_failure
+from stress import inject_failure, _get_stress_receipts_path
 from neuron import FAILURE_TYPES, RECOVERY_SUCCESS_THRESHOLD
+
+
+def get_test_stress_receipts_path():
+    """Get the actual stress receipts path being used by the module."""
+    return _get_stress_receipts_path()
 
 
 @pytest.fixture(autouse=True)
 def clean_test_files():
     """Remove test files before and after each test."""
-    for path in [TEST_LEDGER, TEST_ARCHIVE, TEST_STRESS_RECEIPTS]:
+    paths = [TEST_LEDGER, TEST_ARCHIVE, get_test_stress_receipts_path()]
+    for path in paths:
         if path.exists():
             path.unlink()
     yield
-    for path in [TEST_LEDGER, TEST_ARCHIVE, TEST_STRESS_RECEIPTS]:
+    for path in paths:
         if path.exists():
             path.unlink()
 
@@ -143,8 +149,9 @@ class TestReceiptEmission:
         """Test that inject_failure emits a receipt."""
         inject_failure(failure_type="timeout", rate=0.1, operations=30)
 
-        assert TEST_STRESS_RECEIPTS.exists()
-        with open(TEST_STRESS_RECEIPTS) as f:
+        receipts_path = get_test_stress_receipts_path()
+        assert receipts_path.exists()
+        with open(receipts_path) as f:
             content = f.read()
         assert "failure_injection_receipt" in content
 
@@ -154,7 +161,8 @@ class TestReceiptEmission:
 
         inject_failure(failure_type="corrupt", rate=0.15, operations=40)
 
-        with open(TEST_STRESS_RECEIPTS) as f:
+        receipts_path = get_test_stress_receipts_path()
+        with open(receipts_path) as f:
             receipt = json.loads(f.readline())
 
         assert receipt["type"] == "failure_injection_receipt"
