@@ -1,0 +1,8 @@
+{
+  "rhythm_source": "gaps_live",
+  "alpha_mode": "persistence_survival",
+  "human_role": "meta_steer_optional",
+  "self_conduct_enabled": true,
+  "persistence_window_entries": 1000,
+  "min_gap_ms_for_rhythm": 100
+}

@@ -1,8 +1,8 @@
 """
-NEURON v4.5: The Resonance Catalyst
-Controlled α oscillations tuned to natural frequencies drive triad phase transitions.
-Bidirectional oscillation replaces directional pump. Gaps amplify resonance.
-The organism oscillates to evolve.
+NEURON v4.6: Chain Rhythm Conductor
+Gap-derived self-conduction replaces induced oscillation.
+Silence writes the score, survival selects the notes.
+The ledger is a self-conducting score written by silence.
 """
 
 import hashlib
@@ -241,42 +241,25 @@ BURST_MODE_LATENCY_THRESHOLD = 10000  # ms - switch to burst mode above this
 
 
 # ============================================
-# v4.5 RESONANCE CATALYST CONSTANTS
+# v4.6 CHAIN RHYTHM CONDUCTOR CONSTANTS
 # ============================================
-RESONANCE_MODE = True  # Enable oscillation (vs pump-only)
-OSCILLATION_AMPLITUDE_DEFAULT = 0.5  # Initial α swing target (0-1)
-OSCILLATION_AMPLITUDE_MAX = 1.5  # Divergence threshold → stoprule
+# KILLED: RESONANCE_MODE (no induced oscillation)
+# KILLED: OSCILLATION_AMPLITUDE_* (no amplitude control)
+# KILLED: LOW_ALPHA_INJECTION_RANGE (no injection)
+# KILLED: INJECTION_COUNT_* (no injection)
+# KILLED: SURGE_* (no surge)
+# KILLED: FREQUENCY_SOURCES (rhythm from gaps only)
+# KILLED: GAP_AMPLITUDE_BOOST (gaps compose, don't boost)
 
-# Injection Parameters
-LOW_ALPHA_INJECTION_RANGE = (0.1, 0.3)  # α range for synthetic entries
-INJECTION_COUNT_DEFAULT = 5  # Entries per injection phase
-INJECTION_COUNT_MAX = 100  # Stoprule threshold
+# v4.6: Self-conducting rhythm
+RHYTHM_SOURCE = "gaps_live"  # ONLY source - no external tuning
+ALPHA_MODE = "persistence_survival"  # Survival under gaps = weight
+HUMAN_ROLE = "meta_steer_optional"  # Note, not conductor
+SELF_CONDUCT_ENABLED = True  # Chain conducts itself
 
-# Surge Parameters
-HIGH_ALPHA_SURGE_THRESHOLD = 0.6  # Minimum α to receive surge
-SURGE_MULTIPLIER_DEFAULT = 1.5  # Salience amplification factor
-SURGE_ALPHA_CAP = 1.0  # Maximum α after surge
-
-# Frequency Sources
-FREQUENCY_SOURCES = [
-    "HUMAN_CIRCADIAN",  # 24h
-    "HUMAN_FOCUS",  # 90min
-    "GROK_TOKEN_REFRESH",  # Dynamic
-    "MARS_LIGHT_DELAY",  # 3-22min
-    "INTERSTELLAR_BURST",  # 4yr
-]
-DEFAULT_FREQUENCY = "HUMAN_FOCUS"
-
-# Gap Resonance
-GAP_AMPLITUDE_BOOST = 2.0  # Gap amplifies next oscillation by 2x
-
-# Phase Transition Detection
-TRANSITION_CORRELATION_THRESHOLD = 0.7  # Minimum correlation to count as transition
-
-# Oscillation State (module-level)
-_oscillation_phase = "inject"  # Current phase: "inject" or "surge"
-_oscillation_amplitude = OSCILLATION_AMPLITUDE_DEFAULT
-_oscillation_frequency = 0.001  # Hz
+# Persistence Parameters
+PERSISTENCE_WINDOW_ENTRIES = 1000  # History window for survival analysis
+MIN_GAP_MS_FOR_RHYTHM = 100  # Minimum gap to register in rhythm
 
 
 # CLAUDEME §8 Core Exception
@@ -2232,246 +2215,36 @@ def run_entropy_pump_integration(
 
 
 # ============================================
-# v4.5 GATE 3: GAP RESONANCE DRIVER
+# v4.6 SELF-CONDUCT INTEGRATION
 # ============================================
+# KILLED: v4.5 GATE 3 (gap_resonance_trigger) - gaps compose, don't trigger
+# KILLED: v4.5 GATE 4 (human_direct_phase) - human is note, not conductor
+# KILLED: v4.5 GATE 5 (detect_phase_transition) - no phase control
+# KILLED: reset_oscillation_state, get_current_phase, set_oscillation_state
 
-
-def get_current_phase() -> str:
-    """Return current oscillation phase ("inject" or "surge").
-
-    v4.5: Track oscillation state.
-
-    Returns:
-        Current phase string
-    """
-    return _oscillation_phase
-
-
-def set_oscillation_state(phase: str, amplitude: float, frequency: float) -> None:
-    """Update internal oscillation tracking.
-
-    Args:
-        phase: "inject" or "surge"
-        amplitude: Current amplitude
-        frequency: Current frequency in Hz
-    """
-    global _oscillation_phase, _oscillation_amplitude, _oscillation_frequency
-
-    if phase not in ("inject", "surge"):
-        raise StopRule(
-            "invalid_phase", f"Phase must be 'inject' or 'surge', got: {phase}"
-        )
-
-    _oscillation_phase = phase
-    _oscillation_amplitude = amplitude
-    _oscillation_frequency = frequency
-
-
-def gap_resonance_trigger(gap_event: dict) -> dict:
-    """When gap detected, trigger oscillation cycle with amplified amplitude.
-
-    v4.5: "Gap detection fires oscillation cycle (not export)"
-    "Gap energy amplifies next surge phase"
-
-    Args:
-        gap_event: Dict with source, duration_minutes
-
-    Returns:
-        resonance_driver_receipt
-    """
-    global _oscillation_amplitude
-
-    source = gap_event.get("source", "unknown")
-    duration_minutes = gap_event.get("duration_minutes", 0)
-
-    # Amplify amplitude by gap boost factor
-    amplitude_boost = GAP_AMPLITUDE_BOOST
-    boosted_amplitude = _oscillation_amplitude * amplitude_boost
-
-    # Generate cycle ID for triggered oscillation
-    triggered_cycle_id = f"gap_osc_{uuid.uuid4().hex[:8]}"
-
-    # Update state
-    _oscillation_amplitude = boosted_amplitude
-
-    # Build receipt
-    receipt = emit_receipt(
-        "resonance_driver",
-        {
-            "tenant_id": "neuron",
-            "gap_source": source,
-            "gap_duration_minutes": round(duration_minutes, 2),
-            "amplitude_boost": amplitude_boost,
-            "triggered_cycle_id": triggered_cycle_id,
-            "new_amplitude": round(boosted_amplitude, 4),
-        },
-    )
-
-    return {
-        "receipt_type": "resonance_driver",
-        "gap_source": source,
-        "gap_duration_minutes": duration_minutes,
-        "amplitude_boost": amplitude_boost,
-        "triggered_cycle_id": triggered_cycle_id,
-        "ts": receipt["ts"],
-        "hash": receipt["hash"],
-    }
-
-
-# ============================================
-# v4.5 GATE 4: HUMAN PHASE DIRECTION
-# ============================================
-
-
-def human_direct_phase(
-    direction: str, human_id: str = "human_nerve", override_reason: str = "manual"
-) -> dict:
-    """Human override: set phase to "inject" or "surge".
-
-    v4.5: "Human Nerve specifies: 'inject now' or 'surge now'"
-    "Human timing overrides automatic frequency"
-
-    Args:
-        direction: "inject" or "surge"
-        human_id: Identifier for human issuing command
-        override_reason: Reason for override
-
-    Returns:
-        human_phase_receipt
-
-    Raises:
-        ValueError: If direction is invalid
-    """
-    global _oscillation_phase
-
-    if direction not in ("inject", "surge"):
-        raise ValueError(f"Direction must be 'inject' or 'surge', got: {direction}")
-
-    previous_phase = _oscillation_phase
-    _oscillation_phase = direction
-
-    # Build receipt
-    receipt = emit_receipt(
-        "human_phase",
-        {
-            "tenant_id": "neuron",
-            "direction": direction,
-            "previous_phase": previous_phase,
-            "human_id": human_id,
-            "override_reason": override_reason,
-        },
-    )
-
-    return {
-        "receipt_type": "human_phase",
-        "direction": direction,
-        "previous_phase": previous_phase,
-        "human_id": human_id,
-        "override_reason": override_reason,
-        "ts": receipt["ts"],
-        "hash": receipt["hash"],
-    }
-
-
-# ============================================
-# v4.5 GATE 5: PHASE TRANSITION DETECTION
-# ============================================
-
-
-def detect_phase_transition(triad_state: dict) -> dict:
-    """Check AXIOM/AgentProof for state changes.
-
-    v4.5: "Monitor AXIOM law_discovery events during oscillation"
-    "Monitor AgentProof selection_threshold shifts"
-
-    Args:
-        triad_state: Dict with axiom and agentproof state
-
-    Returns:
-        phase_transition_receipt if detected, empty dict otherwise
-    """
-    axiom_state = triad_state.get("axiom", {})
-    agentproof_state = triad_state.get("agentproof", {})
-
-    # Detect AXIOM law discovery
-    axiom_transition = axiom_state.get("laws_discovered", 0) > 0
-
-    # Detect AgentProof selection shift
-    agentproof_transition = agentproof_state.get("selection_threshold", 0) > 0.5
-
-    # Determine transition type
-    if axiom_transition and agentproof_transition:
-        transition_type = "both"
-    elif axiom_transition:
-        transition_type = "axiom_law"
-    elif agentproof_transition:
-        transition_type = "agentproof_selection"
-    else:
-        transition_type = None
-
-    if transition_type is None:
-        return {
-            "receipt_type": "phase_transition",
-            "transition_type": None,
-            "detected": False,
-        }
-
-    # Calculate correlation with oscillation
-    # Simple heuristic: if we're in high amplitude, correlation is higher
-    oscillation_correlation = min(
-        1.0, _oscillation_amplitude / OSCILLATION_AMPLITUDE_DEFAULT
-    )
-
-    # Build receipt
-    receipt = emit_receipt(
-        "phase_transition",
-        {
-            "tenant_id": "neuron",
-            "transition_type": transition_type,
-            "before_state": {"axiom_laws": 0, "agentproof_threshold": 0},
-            "after_state": {
-                "axiom_laws": axiom_state.get("laws_discovered", 0),
-                "agentproof_threshold": agentproof_state.get("selection_threshold", 0),
-            },
-            "oscillation_correlation": round(oscillation_correlation, 4),
-        },
-    )
-
-    return {
-        "receipt_type": "phase_transition",
-        "transition_type": transition_type,
-        "before_state": {"axiom_laws": 0, "agentproof_threshold": 0},
-        "after_state": {
-            "axiom_laws": axiom_state.get("laws_discovered", 0),
-            "agentproof_threshold": agentproof_state.get("selection_threshold", 0),
-        },
-        "oscillation_correlation": oscillation_correlation,
-        "detected": True,
-        "ts": receipt["ts"],
-        "hash": receipt["hash"],
-    }
-
-
-def reset_oscillation_state():
-    """Reset oscillation state (for testing)."""
-    global _oscillation_phase, _oscillation_amplitude, _oscillation_frequency
-    _oscillation_phase = "inject"
-    _oscillation_amplitude = OSCILLATION_AMPLITUDE_DEFAULT
-    _oscillation_frequency = 0.001
+# v4.6: Import chain conductor for self-conducting rhythm
+# The chain_conductor module provides:
+# - load_self_conduct_spec: Load gap-derived rhythm configuration
+# - derive_rhythm_from_gaps: Rhythm emerges from silence
+# - calculate_persistence_alpha: Survival under gaps = weight
+# - human_meta_append: Optional human harmony (not direction)
+# - verify_self_conduct: Confirm emergent orchestration
+# - detect_induced_oscillation: Resurrection guard
 
 
 if __name__ == "__main__":
-    print("NEURON v4.5 - The Resonance Catalyst")
+    print("NEURON v4.6 - Chain Rhythm Conductor")
     print(f"Ledger: {LEDGER_PATH}")
     print(f"BLAKE3 available: {HAS_BLAKE3}")
     print(f"Shared mode: {LEDGER_SHARED_MODE}")
-    print(f"Resonance mode: {RESONANCE_MODE}")
+    print(f"Rhythm source: {RHYTHM_SOURCE}")
+    print(f"Alpha mode: {ALPHA_MODE}")
+    print(f"Human role: {HUMAN_ROLE}")
+    print(f"Self-conduct enabled: {SELF_CONDUCT_ENABLED}")
     print(f"Projects: {ALLOWED_PROJECTS}")
     print(f"Recovery curves: {RECOVERY_CURVE_MODELS}")
     print(f"Default curve: {DEFAULT_RECOVERY_CURVE}")
     print(f"Shard strategies: {SHARD_STRATEGIES}")
-    print(
-        f"Oscillation amplitude: {OSCILLATION_AMPLITUDE_DEFAULT} - {OSCILLATION_AMPLITUDE_MAX}"
-    )
-    print(f"Surge threshold: α ≥ {HIGH_ALPHA_SURGE_THRESHOLD}")
-    print(f"Gap boost: {GAP_AMPLITUDE_BOOST}x")
+    print()
+    print("The ledger is a self-conducting score written by silence.")
+    print("Gaps compose the rhythm. Survival selects the notes.")
