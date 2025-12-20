@@ -16,7 +16,6 @@ os.environ["NEURON_BASE"] = _test_dir
 import pytest
 from datetime import datetime, timezone, timedelta
 
-import neuron
 from neuron import (
     classify_for_pump,
     export_low_alpha,
@@ -73,12 +72,14 @@ class TestExportToStub:
                 project="neuron",
                 task=f"task {i}",
                 next_action="process",
-                salience=0.2  # Low salience
+                salience=0.2,  # Low salience
             )
 
         # Age entries
         ledger = load_ledger()
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         for e in ledger:
             e["ts"] = old_ts
         _write_ledger(ledger)
@@ -100,15 +101,14 @@ class TestExportToChain:
         """Entries should be queued for blockchain anchor."""
         for i in range(3):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.1
+                project="neuron", task=f"task {i}", next_action="process", salience=0.1
             )
 
         # Age entries
         ledger = load_ledger()
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         for e in ledger:
             e["ts"] = old_ts
         _write_ledger(ledger)
@@ -127,15 +127,14 @@ class TestExportToArchive:
         """Entries should be archived to cold storage."""
         for i in range(3):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.1
+                project="neuron", task=f"task {i}", next_action="process", salience=0.1
             )
 
         # Age entries
         ledger = load_ledger()
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         for e in ledger:
             e["ts"] = old_ts
         _write_ledger(ledger)
@@ -165,10 +164,11 @@ class TestCompressToStub:
             "inference_id": "inf_12345678",
             "context_summary": "lots of context " * 20,
             "hash": "abc123def456" * 5,
-            "_alpha": 0.3
+            "_alpha": 0.3,
         }
 
         import json
+
         original_size = len(json.dumps(entry))
 
         stub = compress_to_stub(entry)
@@ -191,15 +191,14 @@ class TestEntriesRemoved:
         # Create entries
         for i in range(5):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.1
+                project="neuron", task=f"task {i}", next_action="process", salience=0.1
             )
 
         # Age entries
         ledger = load_ledger()
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         for e in ledger:
             e["ts"] = old_ts
         _write_ledger(ledger)
@@ -227,12 +226,14 @@ class TestEntropyDecreased:
                 project="neuron",
                 task=f"task {i}",
                 next_action="process",
-                salience=0.1 if i < 5 else 0.9
+                salience=0.1 if i < 5 else 0.9,
             )
 
         # Age some entries
         ledger = load_ledger()
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         for i, e in enumerate(ledger):
             if i < 5:
                 e["ts"] = old_ts
@@ -255,15 +256,14 @@ class TestExportReceipt:
         """Export should emit receipt with bytes saved."""
         for i in range(3):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.1
+                project="neuron", task=f"task {i}", next_action="process", salience=0.1
             )
 
         # Age entries
         ledger = load_ledger()
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         for e in ledger:
             e["ts"] = old_ts
         _write_ledger(ledger)
@@ -285,15 +285,14 @@ class TestExportCreatesDirs:
         """Export should create directories if they don't exist."""
         for i in range(2):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.1
+                project="neuron", task=f"task {i}", next_action="process", salience=0.1
             )
 
         # Age entries
         ledger = load_ledger()
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         for e in ledger:
             e["ts"] = old_ts
         _write_ledger(ledger)

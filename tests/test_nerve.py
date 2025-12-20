@@ -17,13 +17,9 @@ os.environ["NEURON_RECEIPTS"] = str(Path(_test_dir) / "test_stress_receipts.json
 
 from nerve import (
     trigger_grok_eviction,
-    trigger_grok_reset,
     trigger_agentproof_rollback,
-    trigger_agentproof_anchor,
     trigger_axiom_discovery,
-    trigger_axiom_entropy_spike,
     trigger_human_interrupt,
-    trigger_human_return,
     simulate_triad_activity,
     register_grok_hook,
     register_agentproof_hook,

@@ -4,7 +4,6 @@ Tests for sharding.py module: ShardedLedger, routing, eviction, sync
 """
 
 import json
-import os
 import shutil
 import sys
 import tempfile
@@ -21,7 +20,6 @@ from sharding import (
     SHARD_STRATEGIES,
     DEFAULT_SHARD_STRATEGY,
     SHARD_MAX_ENTRIES,
-    SHARD_EVICTION_PERCENT,
 )
 
 
@@ -50,7 +48,7 @@ def sample_entry():
         "token_count": 1000,
         "inference_id": "test_inf_001",
         "context_summary": "",
-        "hash": "abc123:def456"
+        "hash": "abc123:def456",
     }
 
 
@@ -114,7 +112,9 @@ class TestShardRouting:
 
     def test_time_routing(self, temp_shard_dir):
         """Test time-based routing."""
-        ledger = ShardedLedger(shard_count=24, strategy="time", shard_dir=temp_shard_dir)
+        ledger = ShardedLedger(
+            shard_count=24, strategy="time", shard_dir=temp_shard_dir
+        )
 
         # Different hours should route to different shards
         entry_10am = {"ts": "2025-01-15T10:30:00Z"}
@@ -125,24 +125,28 @@ class TestShardRouting:
 
     def test_project_routing(self, temp_shard_dir):
         """Test project-based routing."""
-        ledger = ShardedLedger(shard_count=4, strategy="project", shard_dir=temp_shard_dir)
+        ledger = ShardedLedger(
+            shard_count=4, strategy="project", shard_dir=temp_shard_dir
+        )
 
         entry_neuron = {"project": "neuron"}
         entry_axiom = {"project": "axiom"}
         entry_agentproof = {"project": "agentproof"}
 
         assert ledger.route(entry_neuron) == 2  # index of "neuron"
-        assert ledger.route(entry_axiom) == 1   # index of "axiom"
+        assert ledger.route(entry_axiom) == 1  # index of "axiom"
         assert ledger.route(entry_agentproof) == 0  # index of "agentproof"
 
     def test_model_routing(self, temp_shard_dir):
         """Test model-based routing."""
-        ledger = ShardedLedger(shard_count=4, strategy="model", shard_dir=temp_shard_dir)
+        ledger = ShardedLedger(
+            shard_count=4, strategy="model", shard_dir=temp_shard_dir
+        )
 
         entry_grok = {"model": "grok"}
         entry_claude = {"model": "claude"}
 
-        assert ledger.route(entry_grok) == 0   # index of "grok"
+        assert ledger.route(entry_grok) == 0  # index of "grok"
         assert ledger.route(entry_claude) == 1  # index of "claude"
 
 
@@ -177,7 +181,7 @@ class TestShardAppend:
             entry = {
                 "ts": f"2025-01-15T{i % 24:02d}:00:00Z",
                 "hash": f"hash_{i}:suffix",
-                "project": "neuron"
+                "project": "neuron",
             }
             ledger.append(entry)
 
@@ -199,10 +203,7 @@ class TestShardReplay:
 
         # Add entries that will land in different shards
         for i in range(20):
-            entry = {
-                "ts": f"2025-01-15T{i:02d}:00:00Z",
-                "hash": f"hash_{i}:suffix"
-            }
+            entry = {"ts": f"2025-01-15T{i:02d}:00:00Z", "hash": f"hash_{i}:suffix"}
             ledger.append(entry)
 
         result = ledger.replay()
@@ -213,7 +214,10 @@ class TestShardReplay:
         ledger = ShardedLedger(shard_count=4, shard_dir=temp_shard_dir)
 
         for i in range(50):
-            entry = {"ts": f"2025-01-15T{i % 24:02d}:{i % 60:02d}:00Z", "hash": f"h{i}:s"}
+            entry = {
+                "ts": f"2025-01-15T{i % 24:02d}:{i % 60:02d}:00Z",
+                "hash": f"h{i}:s",
+            }
             ledger.append(entry)
 
         result = ledger.replay(n=10)
@@ -247,7 +251,9 @@ class TestShardReplay:
 class TestShardEviction:
     def test_eviction_under_limit(self, temp_shard_dir):
         """Test eviction does nothing when under limit."""
-        ledger = ShardedLedger(shard_count=2, max_entries_per_shard=100, shard_dir=temp_shard_dir)
+        ledger = ShardedLedger(
+            shard_count=2, max_entries_per_shard=100, shard_dir=temp_shard_dir
+        )
 
         for i in range(50):
             entry = {"ts": f"2025-01-{i % 28 + 1:02d}T00:00:00Z", "hash": f"h{i}:s"}
@@ -259,7 +265,9 @@ class TestShardEviction:
 
     def test_eviction_over_limit(self, temp_shard_dir):
         """Test eviction when over limit."""
-        ledger = ShardedLedger(shard_count=1, max_entries_per_shard=10, shard_dir=temp_shard_dir)
+        ledger = ShardedLedger(
+            shard_count=1, max_entries_per_shard=10, shard_dir=temp_shard_dir
+        )
 
         for i in range(20):
             entry = {"ts": f"2025-01-{i % 28 + 1:02d}T00:00:00Z", "hash": f"h{i}:s"}
@@ -276,12 +284,15 @@ class TestShardEviction:
     def test_eviction_archives_entries(self, temp_shard_dir):
         """Test evicted entries are archived."""
         import sharding
+
         original_archive = sharding.ARCHIVE_PATH
         test_archive = temp_shard_dir.parent / "archive.jsonl"
         sharding.ARCHIVE_PATH = test_archive
 
         try:
-            ledger = ShardedLedger(shard_count=1, max_entries_per_shard=5, shard_dir=temp_shard_dir)
+            ledger = ShardedLedger(
+                shard_count=1, max_entries_per_shard=5, shard_dir=temp_shard_dir
+            )
 
             for i in range(15):
                 entry = {"ts": f"2025-01-{i % 28 + 1:02d}T00:00:00Z", "hash": f"h{i}:s"}
@@ -341,7 +352,7 @@ class TestShardRebalance:
         ledger = ShardedLedger(shard_count=4, strategy="hash", shard_dir=temp_shard_dir)
 
         for i in range(100):
-            entry = {"ts": f"2025-01-15T00:00:00Z", "hash": f"h{i}:s"}
+            entry = {"ts": "2025-01-15T00:00:00Z", "hash": f"h{i}:s"}
             ledger.append(entry)
 
         result = ledger.rebalance()
@@ -367,7 +378,7 @@ class TestShardStats:
         ledger = ShardedLedger(shard_count=4, shard_dir=temp_shard_dir)
 
         for i in range(100):
-            entry = {"ts": f"2025-01-15T00:00:00Z", "hash": f"h{i}:s"}
+            entry = {"ts": "2025-01-15T00:00:00Z", "hash": f"h{i}:s"}
             ledger.append(entry)
 
         stats = ledger.stats()

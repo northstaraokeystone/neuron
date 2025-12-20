@@ -17,12 +17,9 @@ from neuron import (
     inference_append,
     replay_to_context,
     sync_ledger,
-    append,
     replay,
     prune,
     _read_ledger,
-    _write_ledger,
-    LEDGER_PATH,
     SUPPORTED_MODELS,
 )
 
@@ -35,6 +32,7 @@ def setup_test_ledger():
     os.environ["NEURON_ARCHIVE"] = str(Path(temp_dir) / "archive.jsonl")
     # Reload the module to pick up new paths
     import neuron
+
     neuron.LEDGER_PATH = test_ledger
     neuron.ARCHIVE_PATH = Path(temp_dir) / "archive.jsonl"
     return test_ledger, temp_dir
@@ -50,7 +48,7 @@ def test_inference_append_basic():
         next_action="verify integration",
         context_summary="Testing NEURON v4 inference integration...",
         token_count=5000,
-        inference_id="inf_test_001"
+        inference_id="inf_test_001",
     )
 
     assert entry["model"] == "grok"
@@ -58,7 +56,9 @@ def test_inference_append_basic():
     assert entry["inference_id"] == "inf_test_001"
     assert "context_summary" in entry
     assert entry["project"] == "neuron"
-    print(f"PASS: inference_append - model={entry['model']}, tokens={entry['token_count']}")
+    print(
+        f"PASS: inference_append - model={entry['model']}, tokens={entry['token_count']}"
+    )
 
 
 def test_inference_append_auto_id():
@@ -70,7 +70,7 @@ def test_inference_append_auto_id():
         task="auto id test",
         next_action="check id generated",
         context_summary="Testing auto ID generation...",
-        token_count=1000
+        token_count=1000,
     )
 
     assert entry["inference_id"] is not None
@@ -88,7 +88,7 @@ def test_inference_append_all_models():
             task=f"test {model}",
             next_action="verify model",
             context_summary=f"Testing {model} model...",
-            token_count=1000
+            token_count=1000,
         )
         assert entry["model"] == model
 
@@ -105,7 +105,7 @@ def test_inference_append_invalid_model():
             task="should fail",
             next_action="never reached",
             context_summary="This should fail...",
-            token_count=1000
+            token_count=1000,
         )
         assert False, "Should have raised ValueError"
     except ValueError as e:
@@ -175,7 +175,7 @@ def test_sync_ledger():
             "energy": 1.0,
             "token_count": 3000,
             "inference_id": "inf_remote_001",
-            "context_summary": "Remote context..."
+            "context_summary": "Remote context...",
         }
     ]
     with open(remote_path, "w") as f:
@@ -197,6 +197,7 @@ def test_sync_ledger_conflict_resolution():
 
     # Create local entry with older timestamp
     import neuron
+
     original_append = neuron.append
 
     # Manually create an entry with specific timestamp
@@ -212,7 +213,7 @@ def test_sync_ledger_conflict_resolution():
         "energy": 1.0,
         "token_count": 1000,
         "inference_id": "inf_conflict",
-        "context_summary": "Old local..."
+        "context_summary": "Old local...",
     }
     with open(test_ledger, "w") as f:
         f.write(json.dumps(entry) + "\n")
@@ -231,7 +232,7 @@ def test_sync_ledger_conflict_resolution():
         "energy": 1.0,
         "token_count": 2000,
         "inference_id": "inf_conflict",  # Same inference_id
-        "context_summary": "New remote..."
+        "context_summary": "New remote...",
     }
     with open(remote_path, "w") as f:
         f.write(json.dumps(remote_entry) + "\n")
@@ -252,11 +253,32 @@ def test_multi_model_inference_cycle():
     test_ledger, temp_dir = setup_test_ledger()
 
     # Simulate multi-model inference
-    inference_append("grok", "reasoning step 1", "continue reasoning", "Mars colony entropy...", 10000, "inf_001")
+    inference_append(
+        "grok",
+        "reasoning step 1",
+        "continue reasoning",
+        "Mars colony entropy...",
+        10000,
+        "inf_001",
+    )
     time.sleep(0.05)
-    inference_append("claude", "code review", "merge PR", "AgentProof federation code...", 25000, "inf_002")
+    inference_append(
+        "claude",
+        "code review",
+        "merge PR",
+        "AgentProof federation code...",
+        25000,
+        "inf_002",
+    )
     time.sleep(0.05)
-    inference_append("grok", "reasoning step 2", "conclude", "Entropy budget calculated...", 45000, "inf_003")
+    inference_append(
+        "grok",
+        "reasoning step 2",
+        "conclude",
+        "Entropy budget calculated...",
+        45000,
+        "inf_003",
+    )
 
     # Replay in context format
     ctx = replay_to_context(n=3, format="context")
@@ -277,7 +299,9 @@ def test_prune_compression():
         inference_append("grok", f"task {i}", f"next {i}", f"ctx {i}", 1000)
 
     result = prune(max_age_days=0, salience_threshold=2.0)  # Aggressive for test
-    print(f"PASS: prune - compression achievable (pruned {result['pruned_count']} entries)")
+    print(
+        f"PASS: prune - compression achievable (pruned {result['pruned_count']} entries)"
+    )
 
 
 def test_context_summary_truncation():
@@ -290,7 +314,7 @@ def test_context_summary_truncation():
         task="truncation test",
         next_action="verify length",
         context_summary=long_summary,
-        token_count=1000
+        token_count=1000,
     )
 
     assert len(entry["context_summary"]) <= 500

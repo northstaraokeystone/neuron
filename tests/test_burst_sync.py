@@ -16,14 +16,12 @@ os.environ["NEURON_BASE"] = _test_dir
 import pytest
 from datetime import datetime, timezone, timedelta
 
-import neuron
 from neuron import (
     enable_burst_mode,
     is_burst_mode_active,
     accumulate_for_burst,
     burst_sync,
     reset_burst_state,
-    compute_internal_entropy,
     classify_for_pump,
     append,
     load_ledger,
@@ -36,7 +34,12 @@ from neuron import (
 @pytest.fixture(autouse=True)
 def clean_ledger():
     """Clean ledger files before and after each test."""
-    from neuron import _get_ledger_path, _get_archive_path, _get_receipts_path, _get_stub_path
+    from neuron import (
+        _get_ledger_path,
+        _get_archive_path,
+        _get_receipts_path,
+        _get_stub_path,
+    )
     import shutil
 
     # Reset burst state before each test
@@ -96,8 +99,11 @@ class TestAccumulateEntries:
     def test_accumulate_entries(self):
         """Entries should be queued, not synced."""
         entries = [
-            {"ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-             "project": "neuron", "salience": 0.5}
+            {
+                "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "project": "neuron",
+                "salience": 0.5,
+            }
             for _ in range(10)
         ]
 
@@ -116,15 +122,14 @@ class TestBurstSyncAll:
         # Create and add entries to ledger
         for i in range(5):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.2
+                project="neuron", task=f"task {i}", next_action="process", salience=0.2
             )
 
         # Age entries
         ledger = load_ledger()
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         for e in ledger:
             e["ts"] = old_ts
         _write_ledger(ledger)
@@ -153,15 +158,14 @@ class TestEfficiencyRatio:
         # Create entries
         for i in range(5):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.2
+                project="neuron", task=f"task {i}", next_action="process", salience=0.2
             )
 
         # Age entries
         ledger = load_ledger()
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         for e in ledger:
             e["ts"] = old_ts
         _write_ledger(ledger)
@@ -186,15 +190,14 @@ class TestEntropyDropsOnBurst:
         # Create entries
         for i in range(10):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.2
+                project="neuron", task=f"task {i}", next_action="process", salience=0.2
             )
 
         # Age entries
         ledger = load_ledger()
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         for e in ledger:
             e["ts"] = old_ts
         _write_ledger(ledger)
@@ -218,14 +221,13 @@ class TestBurstReceipt:
         """Burst sync should emit receipt with efficiency metrics."""
         for i in range(5):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.2
+                project="neuron", task=f"task {i}", next_action="process", salience=0.2
             )
 
         ledger = load_ledger()
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         for e in ledger:
             e["ts"] = old_ts
         _write_ledger(ledger)
@@ -263,8 +265,11 @@ class TestMaxBatchEnforced:
         """Queue should not exceed max batch size."""
         # Try to accumulate more than max
         entries = [
-            {"ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-             "project": "neuron", "salience": 0.5}
+            {
+                "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "project": "neuron",
+                "salience": 0.5,
+            }
             for _ in range(BURST_SYNC_MAX_BATCH + 100)
         ]
 

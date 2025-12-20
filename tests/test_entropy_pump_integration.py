@@ -17,13 +17,10 @@ os.environ["NEURON_BASE"] = _test_dir
 import pytest
 from datetime import datetime, timezone, timedelta
 
-import neuron
 from neuron import (
     pump_cycle,
     validate_entropy_target,
     run_entropy_pump_integration,
-    compute_internal_entropy,
-    classify_for_pump,
     reset_burst_state,
     append,
     load_ledger,
@@ -35,7 +32,12 @@ from neuron import (
 @pytest.fixture(autouse=True)
 def clean_ledger():
     """Clean ledger files before and after each test."""
-    from neuron import _get_ledger_path, _get_archive_path, _get_receipts_path, _get_stub_path
+    from neuron import (
+        _get_ledger_path,
+        _get_archive_path,
+        _get_receipts_path,
+        _get_stub_path,
+    )
     import shutil
 
     reset_burst_state()
@@ -72,7 +74,7 @@ class TestPumpCycleRuns:
                 project="neuron",
                 task=f"task {i}",
                 next_action="process",
-                salience=random.random()
+                salience=random.random(),
             )
 
         result = pump_cycle(load_ledger())
@@ -93,7 +95,7 @@ class TestEntropyDecreases:
                 project="neuron",
                 task=f"task {i}",
                 next_action="process",
-                salience=0.2 + random.random() * 0.3
+                salience=0.2 + random.random() * 0.3,
             )
 
         # Age some entries
@@ -122,7 +124,7 @@ class TestTargetAchieved:
                 project="human",
                 task=f"critical task {i}",
                 next_action="do now",
-                salience=0.9
+                salience=0.9,
             )
 
         # Add replay counts
@@ -134,7 +136,9 @@ class TestTargetAchieved:
         result = validate_entropy_target(load_ledger())
 
         # With high-salience, high-replay entries, entropy should be low
-        assert result["final_entropy"] <= 0.5  # Reasonable for fresh high-salience entries
+        assert (
+            result["final_entropy"] <= 0.5
+        )  # Reasonable for fresh high-salience entries
 
 
 class TestExportAndRecircBoth:
@@ -147,10 +151,7 @@ class TestExportAndRecircBoth:
         # Create low-α entries
         for i in range(5):
             append(
-                project="grok",
-                task=f"low task {i}",
-                next_action="maybe",
-                salience=0.1
+                project="grok", task=f"low task {i}", next_action="maybe", salience=0.1
             )
 
         # Age low entries
@@ -165,7 +166,7 @@ class TestExportAndRecircBoth:
                 project="human",
                 task=f"critical task {i}",
                 next_action="now",
-                salience=1.0
+                salience=1.0,
             )
 
         ledger = load_ledger()
@@ -190,15 +191,12 @@ class TestGapTriggersWork:
         now = datetime.now(timezone.utc)
 
         # Create entries with significant gap
-        append(
-            project="human",
-            task="before gap",
-            next_action="wait",
-            salience=0.2
-        )
+        append(project="human", task="before gap", next_action="wait", salience=0.2)
 
         ledger = load_ledger()
-        ledger[0]["ts"] = (now - timedelta(days=30, hours=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        ledger[0]["ts"] = (now - timedelta(days=30, hours=5)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         _write_ledger(ledger)
 
         for i in range(5):
@@ -206,7 +204,7 @@ class TestGapTriggersWork:
                 project="neuron",
                 task=f"after gap {i}",
                 next_action="process",
-                salience=0.2
+                salience=0.2,
             )
 
         # Age remaining entries
@@ -231,10 +229,7 @@ class TestBurstModeOptional:
 
         for i in range(5):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.5
+                project="neuron", task=f"task {i}", next_action="process", salience=0.5
             )
 
         result = pump_cycle(load_ledger())
@@ -250,10 +245,7 @@ class TestIntegrationReceipt:
         """Integration should emit receipt with all metrics."""
         for i in range(10):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.5
+                project="neuron", task=f"task {i}", next_action="process", salience=0.5
             )
 
         result = run_entropy_pump_integration(max_cycles=3)
@@ -281,7 +273,7 @@ class TestIdempotentCycles:
                 project=project,
                 task=f"task {i}",
                 next_action="process",
-                salience=salience
+                salience=salience,
             )
 
         # Age some entries
@@ -305,10 +297,7 @@ class TestValidationResult:
         """Validation should return proper structure."""
         for i in range(5):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.5
+                project="neuron", task=f"task {i}", next_action="process", salience=0.5
             )
 
         result = validate_entropy_target(load_ledger())

@@ -1,6 +1,5 @@
 """Tests for NEURON v3 biologically grounded ledger."""
 
-import json
 import os
 import tempfile
 import time
@@ -18,7 +17,6 @@ os.environ["NEURON_ARCHIVE"] = str(TEST_ARCHIVE)
 os.environ["NEURON_RECEIPTS"] = str(TEST_RECEIPTS)
 
 from neuron import (
-    ALLOWED_PROJECTS,
     alpha,
     append,
     consolidate,
@@ -77,29 +75,41 @@ class TestEnergyEstimate:
 
     def test_technical_task_higher_energy(self):
         simple = energy_estimate("fix bug", "test")
-        technical = energy_estimate("implement merkle proof federation", "verify hash entropy")
+        technical = energy_estimate(
+            "implement merkle proof federation", "verify hash entropy"
+        )
         assert technical > simple
 
     def test_longer_task_higher_energy(self):
         short = energy_estimate("fix", "test")
-        long = energy_estimate("implement the complete authentication flow", "write integration tests")
+        long = energy_estimate(
+            "implement the complete authentication flow", "write integration tests"
+        )
         assert long > short
 
 
 class TestSalienceDecay:
     def test_fresh_entry_full_salience(self):
-        entry = {"ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "salience": 1.0, "replay_count": 0}
+        entry = {
+            "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "salience": 1.0,
+            "replay_count": 0,
+        }
         decayed = salience_decay(entry)
         assert decayed > 0.99  # Nearly 1.0 for fresh entry
 
     def test_old_entry_decayed(self):
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         entry = {"ts": old_ts, "salience": 1.0, "replay_count": 0}
         decayed = salience_decay(entry)
         assert decayed < 0.5  # Significantly decayed after 30 days
 
     def test_replay_slows_decay(self):
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         no_replay = {"ts": old_ts, "salience": 1.0, "replay_count": 0}
         with_replay = {"ts": old_ts, "salience": 1.0, "replay_count": 5}
         assert salience_decay(with_replay) > salience_decay(no_replay)
@@ -285,7 +295,9 @@ class TestIntegration:
     def test_full_lifecycle(self):
         """Test the full lifecycle of an entry: append -> replay -> consolidate -> decay check."""
         # Append
-        entry = append("neuron", "implement federation", "write merkle proofs", "abc123")
+        entry = append(
+            "neuron", "implement federation", "write merkle proofs", "abc123"
+        )
         assert entry["salience"] == 1.0
         assert entry["energy"] >= 0.5  # Valid energy range
 
@@ -314,7 +326,7 @@ class TestIntegration:
 
         # Should increase monotonically
         for i in range(1, len(costs)):
-            assert costs[i] >= costs[i-1]
+            assert costs[i] >= costs[i - 1]
 
         # At 120 minutes, should be around 3.5
         assert 3.0 < recovery_cost(120) < 4.0

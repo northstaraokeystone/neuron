@@ -16,7 +16,6 @@ os.environ["NEURON_BASE"] = _test_dir
 import pytest
 from datetime import datetime, timezone
 
-import neuron
 from neuron import (
     classify_for_pump,
     recirculate_high_alpha,
@@ -55,10 +54,7 @@ class TestRecirculateIncreasesSalience:
         """Salience should increase by amplification factor."""
         # Create high-salience entry
         append(
-            project="human",
-            task="critical task",
-            next_action="do now",
-            salience=0.9
+            project="human", task="critical task", next_action="do now", salience=0.9
         )
 
         # Add replay count to boost α
@@ -84,7 +80,7 @@ class TestSalienceCappedAtOne:
             "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "salience": 0.9,  # Will exceed 1.0 after 2x amplification
             "project": "neuron",
-            "_alpha": 0.8
+            "_alpha": 0.8,
         }
 
         amplified = amplify_entry(entry, factor=2.0)
@@ -102,7 +98,7 @@ class TestReplayCountIncremented:
             "salience": 0.8,
             "replay_count": 3,
             "project": "neuron",
-            "_alpha": 0.8
+            "_alpha": 0.8,
         }
 
         amplified = amplify_entry(entry)
@@ -119,7 +115,7 @@ class TestAmplifiedAtSet:
             "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "salience": 0.8,
             "project": "neuron",
-            "_alpha": 0.8
+            "_alpha": 0.8,
         }
 
         amplified = amplify_entry(entry)
@@ -139,7 +135,7 @@ class TestEntropyDecreased:
                 project="human",
                 task=f"critical task {i}",
                 next_action="do now",
-                salience=0.9
+                salience=0.9,
             )
 
         # Add replay counts
@@ -166,18 +162,8 @@ class TestOnlyHighAlpha:
     def test_only_high_alpha(self):
         """Only entries with α ≥ threshold should be recirculated."""
         # Create mixed entries
-        append(
-            project="human",
-            task="high priority",
-            next_action="now",
-            salience=1.0
-        )
-        append(
-            project="grok",
-            task="low priority",
-            next_action="later",
-            salience=0.1
-        )
+        append(project="human", task="high priority", next_action="now", salience=1.0)
+        append(project="grok", task="low priority", next_action="later", salience=0.1)
 
         # Add replay to first entry
         ledger = load_ledger()
@@ -198,12 +184,7 @@ class TestRecircReceipt:
         """Recirculation should emit receipt with before/after."""
         # Create high-salience entries
         for i in range(3):
-            append(
-                project="human",
-                task=f"task {i}",
-                next_action="do",
-                salience=0.9
-            )
+            append(project="human", task=f"task {i}", next_action="do", salience=0.9)
 
         # Add replay counts
         ledger = load_ledger()
@@ -234,7 +215,7 @@ class TestAmplificationFactor:
             "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "salience": 0.4,
             "project": "neuron",
-            "_alpha": 0.8
+            "_alpha": 0.8,
         }
 
         amplified = amplify_entry(entry, factor=1.5)
@@ -252,7 +233,7 @@ class TestRecirculationRound:
             "salience": 0.8,
             "recirculation_round": 2,
             "project": "neuron",
-            "_alpha": 0.8
+            "_alpha": 0.8,
         }
 
         amplified = amplify_entry(entry)

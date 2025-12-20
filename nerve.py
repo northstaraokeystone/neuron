@@ -7,7 +7,6 @@ Coordinates bio-silicon continuity across AgentProof, AXIOM, and Grok.
 
 import random
 import time
-from datetime import datetime, timezone
 from typing import Callable
 
 from neuron import (
@@ -16,8 +15,6 @@ from neuron import (
     append_from_axiom,
     append_from_grok,
     emit_receipt,
-    load_ledger,
-    ALLOWED_PROJECTS,
     AI_EVENT_TYPES,
     MAX_TASK_LEN,
 )
@@ -73,23 +70,22 @@ def trigger_grok_eviction(tokens_evicted: int, reason: str) -> dict:
     Returns:
         Entry dict
     """
-    context = {
-        "tokens_evicted": tokens_evicted,
-        "reason": reason,
-        "trigger": "auto"
-    }
+    context = {"tokens_evicted": tokens_evicted, "reason": reason, "trigger": "auto"}
 
     entry = append_from_grok("eviction", context)
     _fire_hooks("grok", "eviction", context)
 
     # Emit ai_event_auto_receipt
-    emit_receipt("ai_event_auto", {
-        "tenant_id": "neuron",
-        "project": "grok",
-        "event_type": "eviction",
-        "trigger": "auto",
-        "source_context": context
-    })
+    emit_receipt(
+        "ai_event_auto",
+        {
+            "tenant_id": "neuron",
+            "project": "grok",
+            "event_type": "eviction",
+            "trigger": "auto",
+            "source_context": context,
+        },
+    )
 
     return entry
 
@@ -105,22 +101,21 @@ def trigger_grok_reset(reason: str = "cold_start") -> dict:
     Returns:
         Entry dict
     """
-    context = {
-        "tokens_evicted": 0,
-        "reason": reason,
-        "trigger": "auto"
-    }
+    context = {"tokens_evicted": 0, "reason": reason, "trigger": "auto"}
 
     entry = append_from_grok("reset", context)
     _fire_hooks("grok", "reset", context)
 
-    emit_receipt("ai_event_auto", {
-        "tenant_id": "neuron",
-        "project": "grok",
-        "event_type": "reset",
-        "trigger": "auto",
-        "source_context": context
-    })
+    emit_receipt(
+        "ai_event_auto",
+        {
+            "tenant_id": "neuron",
+            "project": "grok",
+            "event_type": "reset",
+            "trigger": "auto",
+            "source_context": context,
+        },
+    )
 
     return entry
 
@@ -137,22 +132,21 @@ def trigger_agentproof_rollback(tx_hash: str, anomaly_type: str) -> dict:
     Returns:
         Entry dict
     """
-    context = {
-        "tx_hash": tx_hash,
-        "anomaly_type": anomaly_type,
-        "trigger": "auto"
-    }
+    context = {"tx_hash": tx_hash, "anomaly_type": anomaly_type, "trigger": "auto"}
 
     entry = append_from_agentproof("rollback", context)
     _fire_hooks("agentproof", "rollback", context)
 
-    emit_receipt("ai_event_auto", {
-        "tenant_id": "neuron",
-        "project": "agentproof",
-        "event_type": "rollback",
-        "trigger": "auto",
-        "source_context": context
-    })
+    emit_receipt(
+        "ai_event_auto",
+        {
+            "tenant_id": "neuron",
+            "project": "agentproof",
+            "event_type": "rollback",
+            "trigger": "auto",
+            "source_context": context,
+        },
+    )
 
     return entry
 
@@ -169,22 +163,21 @@ def trigger_agentproof_anchor(tx_hash: str, block_height: int) -> dict:
     Returns:
         Entry dict
     """
-    context = {
-        "tx_hash": tx_hash,
-        "block_height": block_height,
-        "trigger": "auto"
-    }
+    context = {"tx_hash": tx_hash, "block_height": block_height, "trigger": "auto"}
 
     entry = append_from_agentproof("anchor", context)
     _fire_hooks("agentproof", "anchor", context)
 
-    emit_receipt("ai_event_auto", {
-        "tenant_id": "neuron",
-        "project": "agentproof",
-        "event_type": "anchor",
-        "trigger": "auto",
-        "source_context": context
-    })
+    emit_receipt(
+        "ai_event_auto",
+        {
+            "tenant_id": "neuron",
+            "project": "agentproof",
+            "event_type": "anchor",
+            "trigger": "auto",
+            "source_context": context,
+        },
+    )
 
     return entry
 
@@ -201,22 +194,21 @@ def trigger_axiom_discovery(law: str, compression: float) -> dict:
     Returns:
         Entry dict
     """
-    context = {
-        "law": law,
-        "compression": compression,
-        "trigger": "auto"
-    }
+    context = {"law": law, "compression": compression, "trigger": "auto"}
 
     entry = append_from_axiom("law_discovery", context)
     _fire_hooks("axiom", "law_discovery", context)
 
-    emit_receipt("ai_event_auto", {
-        "tenant_id": "neuron",
-        "project": "axiom",
-        "event_type": "discovery",
-        "trigger": "auto",
-        "source_context": context
-    })
+    emit_receipt(
+        "ai_event_auto",
+        {
+            "tenant_id": "neuron",
+            "project": "axiom",
+            "event_type": "discovery",
+            "trigger": "auto",
+            "source_context": context,
+        },
+    )
 
     return entry
 
@@ -233,22 +225,21 @@ def trigger_axiom_entropy_spike(entropy_value: float, threshold: float) -> dict:
     Returns:
         Entry dict
     """
-    context = {
-        "entropy": entropy_value,
-        "threshold": threshold,
-        "trigger": "auto"
-    }
+    context = {"entropy": entropy_value, "threshold": threshold, "trigger": "auto"}
 
     entry = append_from_axiom("entropy_spike", context)
     _fire_hooks("axiom", "entropy_spike", context)
 
-    emit_receipt("ai_event_auto", {
-        "tenant_id": "neuron",
-        "project": "axiom",
-        "event_type": "entropy_spike",
-        "trigger": "auto",
-        "source_context": context
-    })
+    emit_receipt(
+        "ai_event_auto",
+        {
+            "tenant_id": "neuron",
+            "project": "axiom",
+            "event_type": "entropy_spike",
+            "trigger": "auto",
+            "source_context": context,
+        },
+    )
 
     return entry
 
@@ -264,10 +255,7 @@ def trigger_human_interrupt(reason: str) -> dict:
     Returns:
         Entry dict
     """
-    context = {
-        "reason": reason,
-        "trigger": "auto"
-    }
+    context = {"reason": reason, "trigger": "auto"}
 
     entry = append(
         project="human",
@@ -275,17 +263,20 @@ def trigger_human_interrupt(reason: str) -> dict:
         next_action="resume_when_ready",
         event_type="human_interrupt",
         salience=0.9,
-        source_context=context
+        source_context=context,
     )
     _fire_hooks("human", "interrupt", context)
 
-    emit_receipt("ai_event_auto", {
-        "tenant_id": "neuron",
-        "project": "human",
-        "event_type": "interrupt",
-        "trigger": "auto",
-        "source_context": context
-    })
+    emit_receipt(
+        "ai_event_auto",
+        {
+            "tenant_id": "neuron",
+            "project": "human",
+            "event_type": "interrupt",
+            "trigger": "auto",
+            "source_context": context,
+        },
+    )
 
     return entry
 
@@ -301,10 +292,7 @@ def trigger_human_return(gap_minutes: float = 0.0) -> dict:
     Returns:
         Entry dict
     """
-    context = {
-        "gap_minutes": gap_minutes,
-        "trigger": "auto"
-    }
+    context = {"gap_minutes": gap_minutes, "trigger": "auto"}
 
     entry = append(
         project="human",
@@ -312,17 +300,20 @@ def trigger_human_return(gap_minutes: float = 0.0) -> dict:
         next_action="continue_work",
         event_type="human_return",
         salience=0.8,
-        source_context=context
+        source_context=context,
     )
     _fire_hooks("human", "return", context)
 
-    emit_receipt("ai_event_auto", {
-        "tenant_id": "neuron",
-        "project": "human",
-        "event_type": "return",
-        "trigger": "auto",
-        "source_context": context
-    })
+    emit_receipt(
+        "ai_event_auto",
+        {
+            "tenant_id": "neuron",
+            "project": "human",
+            "event_type": "return",
+            "trigger": "auto",
+            "source_context": context,
+        },
+    )
 
     return entry
 
@@ -346,13 +337,36 @@ def simulate_triad_activity(n_events: int = 100, seed: int | None = None) -> lis
 
     # Event generators with weights
     generators = [
-        (0.25, lambda: trigger_human_interrupt(random.choice(["lunch", "meeting", "call", "break"]))),
+        (
+            0.25,
+            lambda: trigger_human_interrupt(
+                random.choice(["lunch", "meeting", "call", "break"])
+            ),
+        ),
         (0.15, lambda: trigger_human_return(random.uniform(5, 120))),
-        (0.15, lambda: trigger_grok_eviction(random.randint(1000, 10000), "context_full")),
+        (
+            0.15,
+            lambda: trigger_grok_eviction(random.randint(1000, 10000), "context_full"),
+        ),
         (0.10, lambda: trigger_grok_reset("cold_start")),
-        (0.10, lambda: trigger_agentproof_rollback(f"0x{random.randint(0, 0xFFFFFF):06x}", "proof_failed")),
-        (0.10, lambda: trigger_agentproof_anchor(f"0x{random.randint(0, 0xFFFFFF):06x}", random.randint(1000, 100000))),
-        (0.10, lambda: trigger_axiom_discovery(random.choice(["V=kr", "F=ma", "E=mc2"]), random.uniform(0.8, 0.99))),
+        (
+            0.10,
+            lambda: trigger_agentproof_rollback(
+                f"0x{random.randint(0, 0xFFFFFF):06x}", "proof_failed"
+            ),
+        ),
+        (
+            0.10,
+            lambda: trigger_agentproof_anchor(
+                f"0x{random.randint(0, 0xFFFFFF):06x}", random.randint(1000, 100000)
+            ),
+        ),
+        (
+            0.10,
+            lambda: trigger_axiom_discovery(
+                random.choice(["V=kr", "F=ma", "E=mc2"]), random.uniform(0.8, 0.99)
+            ),
+        ),
         (0.05, lambda: trigger_axiom_entropy_spike(random.uniform(0.8, 1.5), 0.75)),
     ]
 

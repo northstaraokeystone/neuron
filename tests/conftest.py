@@ -7,11 +7,7 @@ This conftest only provides helpers and markers, not global env setup, to avoid
 conflicts with test-file-specific paths.
 """
 
-import json
-import os
-import tempfile
 from datetime import datetime, timezone
-from pathlib import Path
 
 import pytest
 
@@ -53,7 +49,7 @@ def sample_entry():
         "energy": 1.0,
         "token_count": 1000,
         "inference_id": "inf_test",
-        "context_summary": "Test context"
+        "context_summary": "Test context",
     }
 
 
@@ -69,4 +65,6 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "slow: mark test as slow running")
     config.addinivalue_line("markers", "stress: mark test as stress/load test")
     config.addinivalue_line("markers", "integration: mark test as integration test")
-    config.addinivalue_line("markers", "claudeme: mark test as CLAUDEME compliance test")
+    config.addinivalue_line(
+        "markers", "claudeme: mark test as CLAUDEME compliance test"
+    )

@@ -3,11 +3,9 @@ NEURON v4.2 Recovery Curves Test Suite
 Tests for curves.py module: RecoveryCurve, exponential_decay, power_law, linear
 """
 
-import math
 import sys
 from pathlib import Path
 
-import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -64,7 +62,7 @@ class TestExponentialDecay:
 
     def test_tau_effect(self):
         """Test that lower tau increases cost faster."""
-        cost_fast = exponential_decay(60, tau=60)   # Fast recovery expected
+        cost_fast = exponential_decay(60, tau=60)  # Fast recovery expected
         cost_slow = exponential_decay(60, tau=240)  # Slow recovery expected
 
         # Same gap, but fast tau should give higher cost
@@ -209,8 +207,12 @@ class TestRecoveryCurveClass:
 
     def test_cost_matches_function(self):
         """Test cost method matches standalone functions."""
-        curve_exp = RecoveryCurve(model="exponential_decay", K=EXP_DECAY_K, tau=EXP_DECAY_TAU)
-        curve_pow = RecoveryCurve(model="power_law", alpha=POWER_LAW_ALPHA, scale=POWER_LAW_SCALE)
+        curve_exp = RecoveryCurve(
+            model="exponential_decay", K=EXP_DECAY_K, tau=EXP_DECAY_TAU
+        )
+        curve_pow = RecoveryCurve(
+            model="power_law", alpha=POWER_LAW_ALPHA, scale=POWER_LAW_SCALE
+        )
         curve_lin = RecoveryCurve(model="linear", tau=EXP_DECAY_TAU)
 
         gap = 90

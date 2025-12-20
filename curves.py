@@ -14,15 +14,17 @@ RECOVERY_CURVE_MODELS = ["exponential_decay", "power_law", "linear"]
 DEFAULT_RECOVERY_CURVE = "exponential_decay"
 
 # Exponential decay parameters (Monsell 2003 task-set inertia)
-EXP_DECAY_K = 4.0          # Maximum additional cost
-EXP_DECAY_TAU = 120.0      # Time constant (default, configurable)
+EXP_DECAY_K = 4.0  # Maximum additional cost
+EXP_DECAY_TAU = 120.0  # Time constant (default, configurable)
 
 # Power law parameters (Altmann & Trafton 2002 memory-for-goals)
-POWER_LAW_ALPHA = 0.5      # Decay exponent
-POWER_LAW_SCALE = 2.0      # Scale factor
+POWER_LAW_ALPHA = 0.5  # Decay exponent
+POWER_LAW_SCALE = 2.0  # Scale factor
 
 
-def exponential_decay(gap_minutes: float, K: float = EXP_DECAY_K, tau: float = EXP_DECAY_TAU) -> float:
+def exponential_decay(
+    gap_minutes: float, K: float = EXP_DECAY_K, tau: float = EXP_DECAY_TAU
+) -> float:
     """
     Monsell 2003 task-set inertia model.
 
@@ -42,7 +44,9 @@ def exponential_decay(gap_minutes: float, K: float = EXP_DECAY_K, tau: float = E
     return 1.0 + K * (1.0 - math.exp(-gap_minutes / tau))
 
 
-def power_law(gap_minutes: float, alpha: float = POWER_LAW_ALPHA, scale: float = POWER_LAW_SCALE) -> float:
+def power_law(
+    gap_minutes: float, alpha: float = POWER_LAW_ALPHA, scale: float = POWER_LAW_SCALE
+) -> float:
     """
     Altmann & Trafton 2002 memory-for-goals model.
 
@@ -59,7 +63,7 @@ def power_law(gap_minutes: float, alpha: float = POWER_LAW_ALPHA, scale: float =
     """
     if gap_minutes <= 0:
         return 1.0
-    return 1.0 + scale * (gap_minutes ** alpha)
+    return 1.0 + scale * (gap_minutes**alpha)
 
 
 def linear(gap_minutes: float, tau: float = EXP_DECAY_TAU) -> float:
@@ -85,9 +89,13 @@ class RecoveryCurve:
     Alternative: power law (Altmann & Trafton 2002).
     """
 
-    def __init__(self,
-                 model: Literal["exponential_decay", "power_law", "linear"] = DEFAULT_RECOVERY_CURVE,
-                 **params):
+    def __init__(
+        self,
+        model: Literal[
+            "exponential_decay", "power_law", "linear"
+        ] = DEFAULT_RECOVERY_CURVE,
+        **params,
+    ):
         """
         Initialize recovery curve with specified model.
 
@@ -141,7 +149,11 @@ class RecoveryCurve:
             Dict with model, parameters, and fit score (R-squared)
         """
         if not gaps or not recoveries or len(gaps) != len(recoveries):
-            return {"model": self.model, "parameters": self._get_params(), "fit_score": 0.0}
+            return {
+                "model": self.model,
+                "parameters": self._get_params(),
+                "fit_score": 0.0,
+            }
 
         # Compute predicted values
         predicted = [self.cost(g) for g in gaps]
@@ -157,7 +169,7 @@ class RecoveryCurve:
             "model": self.model,
             "parameters": self._get_params(),
             "fit_score": round(max(0.0, r_squared), 4),
-            "n_samples": len(gaps)
+            "n_samples": len(gaps),
         }
 
     def compare(self, other: "RecoveryCurve", gaps: list[float]) -> dict:
@@ -183,7 +195,7 @@ class RecoveryCurve:
             "gaps_compared": len(gaps),
             "avg_absolute_difference": round(avg_diff, 4),
             "self_costs": [round(c, 2) for c in self_costs],
-            "other_costs": [round(c, 2) for c in other_costs]
+            "other_costs": [round(c, 2) for c in other_costs],
         }
 
     def _get_params(self) -> dict:

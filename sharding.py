@@ -15,6 +15,7 @@ from typing import Literal
 
 try:
     import blake3
+
     HAS_BLAKE3 = True
 except ImportError:
     HAS_BLAKE3 = False
@@ -27,7 +28,9 @@ DEFAULT_SHARD_STRATEGY = "hash"
 SHARD_MAX_ENTRIES = 1_000_000
 SHARD_EVICTION_PERCENT = 0.20  # Evict oldest 20%
 SHARD_DIR = Path(os.environ.get("NEURON_SHARD_DIR", Path.home() / "neuron" / "shards"))
-ARCHIVE_PATH = Path(os.environ.get("NEURON_ARCHIVE", Path.home() / "neuron" / "archive.jsonl"))
+ARCHIVE_PATH = Path(
+    os.environ.get("NEURON_ARCHIVE", Path.home() / "neuron" / "archive.jsonl")
+)
 
 # Project/model mappings for routing strategies
 PROJECTS = ["agentproof", "axiom", "neuron"]
@@ -39,7 +42,11 @@ def _dual_hash(data: bytes | str) -> str:
     if isinstance(data, str):
         data = data.encode("utf-8")
     sha256_hex = hashlib.sha256(data).hexdigest()
-    blake3_hex = blake3.blake3(data).hexdigest() if HAS_BLAKE3 else hashlib.sha256(b"blake3:" + data).hexdigest()
+    blake3_hex = (
+        blake3.blake3(data).hexdigest()
+        if HAS_BLAKE3
+        else hashlib.sha256(b"blake3:" + data).hexdigest()
+    )
     return f"{sha256_hex}:{blake3_hex}"
 
 
@@ -49,13 +56,17 @@ class ShardedLedger:
     Inspired by Grok's sliding window: truncate oldest when full.
     """
 
-    def __init__(self,
-                 shard_count: int = DEFAULT_SHARD_COUNT,
-                 strategy: Literal["hash", "time", "project", "model"] = DEFAULT_SHARD_STRATEGY,
-                 max_entries_per_shard: int = SHARD_MAX_ENTRIES,
-                 shard_dir: Path | None = None):
+    def __init__(
+        self,
+        shard_count: int = DEFAULT_SHARD_COUNT,
+        strategy: Literal["hash", "time", "project", "model"] = DEFAULT_SHARD_STRATEGY,
+        max_entries_per_shard: int = SHARD_MAX_ENTRIES,
+        shard_dir: Path | None = None,
+    ):
         self.shard_count = min(max(1, shard_count), MAX_SHARD_COUNT)
-        self.strategy = strategy if strategy in SHARD_STRATEGIES else DEFAULT_SHARD_STRATEGY
+        self.strategy = (
+            strategy if strategy in SHARD_STRATEGIES else DEFAULT_SHARD_STRATEGY
+        )
         self.max_entries_per_shard = max_entries_per_shard
         self.shard_dir = Path(shard_dir) if shard_dir else SHARD_DIR
         self._lock = threading.Lock()
@@ -79,7 +90,9 @@ class ShardedLedger:
             entry_hash = entry.get("hash", "")
             if not entry_hash:
                 # Fallback to hashing the entry content
-                entry_hash = hashlib.sha256(json.dumps(entry, sort_keys=True).encode()).hexdigest()
+                entry_hash = hashlib.sha256(
+                    json.dumps(entry, sort_keys=True).encode()
+                ).hexdigest()
             # Handle dual-hash format (sha256:blake3) or plain hash
             if ":" in entry_hash:
                 entry_hash = entry_hash.split(":")[0]
@@ -143,7 +156,9 @@ class ShardedLedger:
         ARCHIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(ARCHIVE_PATH, "a") as f:
             for e in entries:
-                e["archived_ts"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                e["archived_ts"] = datetime.now(timezone.utc).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                )
                 f.write(json.dumps(e) + "\n")
 
     def append(self, entry: dict) -> dict:
@@ -210,7 +225,7 @@ class ShardedLedger:
             "shard_id": shard_id,
             "evicted": evict_count,
             "remaining": len(to_keep),
-            "reason": "over_limit"
+            "reason": "over_limit",
         }
 
     def sync(self) -> dict:
@@ -233,7 +248,7 @@ class ShardedLedger:
             "total_entries": total_entries,
             "conflicts": conflicts,
             "shard_hashes": shard_hashes,
-            "sync_ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            "sync_ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
 
     def rebalance(self) -> dict:
@@ -261,7 +276,7 @@ class ShardedLedger:
         return {
             "rebalanced": True,
             "total_entries": len(all_entries),
-            "entries_per_shard": entries_per_shard
+            "entries_per_shard": entries_per_shard,
         }
 
     def stats(self) -> dict:
@@ -275,11 +290,9 @@ class ShardedLedger:
             entries = self._read_shard(i)
             size_bytes = shard_path.stat().st_size if shard_path.exists() else 0
 
-            shards.append({
-                "shard_id": i,
-                "count": len(entries),
-                "size_bytes": size_bytes
-            })
+            shards.append(
+                {"shard_id": i, "count": len(entries), "size_bytes": size_bytes}
+            )
             total_entries += len(entries)
             total_bytes += size_bytes
 
@@ -289,19 +302,22 @@ class ShardedLedger:
             "max_entries_per_shard": self.max_entries_per_shard,
             "total_entries": total_entries,
             "total_bytes": total_bytes,
-            "shards": shards
+            "shards": shards,
         }
 
 
 def _emit_shard_receipt(receipt_type: str, data: dict) -> dict:
     """Emit a sharding receipt."""
     from stress import _get_stress_receipts_path
+
     receipt = {
         "type": receipt_type,
         "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        **data
+        **data,
     }
-    receipt["hash"] = _dual_hash(json.dumps({k: v for k, v in receipt.items() if k != "hash"}, sort_keys=True))
+    receipt["hash"] = _dual_hash(
+        json.dumps({k: v for k, v in receipt.items() if k != "hash"}, sort_keys=True)
+    )
     receipts_path = _get_stress_receipts_path()
     receipts_path.parent.mkdir(parents=True, exist_ok=True)
     with open(receipts_path, "a") as f:
