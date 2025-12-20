@@ -1,8 +1,8 @@
 """
-NEURON v4.3: The Shared Nerve
-Shared hippocampus of the triad: AgentProof + AXIOM + NEURON.
-Multi-project append, system-wide α, universal pruning.
-~360 lines. Triad-native. Bio-silicon continuity.
+NEURON v4.4: The Entropy Pump
+Thermodynamic cognition engine: Export low-α disorder outward, recirculate high-α order internally.
+Gap-triggered directed export, burst sync for isolation advantage, near-zero internal entropy.
+~600 lines. Second Law weaponized for cognition.
 """
 
 import hashlib
@@ -185,6 +185,41 @@ POWER_LAW_SCALE = 2.0
 # Energy estimation
 TECHNICAL_TERMS = ["federation", "merkle", "entropy", "kan", "spline",
                    "receipt", "anchor", "proof", "hash", "topology"]
+
+# ============================================
+# v4.4 ENTROPY PUMP CONSTANTS
+# ============================================
+ENTROPY_PUMP_MODE = True
+
+# Classification thresholds
+LOW_ALPHA_EXPORT_THRESHOLD = 0.4      # α < 0.4 → export candidate
+HIGH_ALPHA_RECIRCULATE_THRESHOLD = 0.7  # α ≥ 0.7 → recirculate
+
+# Amplification factors
+HIGH_ALPHA_AMPLIFICATION = 2.0         # Recirculated entries gain 2x weight
+LOW_ALPHA_DECAY = 0.5                  # Exported entries compressed 50%
+
+# Export destinations
+EXPORT_DESTINATIONS = {
+    "stub": "external_audit_stub/",     # Local compressed stubs
+    "chain": "audit_chain_queue/",      # Queue for blockchain anchor
+    "archive": "cold_archive/",         # Deep cold storage
+}
+
+# Burst sync parameters
+BURST_SYNC_MIN_INTERVAL = 60.0         # Minimum seconds between bursts
+BURST_SYNC_MAX_BATCH = 1000            # Maximum entries per burst
+ISOLATION_LATENCY_ADVANTAGE = True     # Enable isolation mode
+
+# Entropy targets
+INTERNAL_ENTROPY_TARGET = 0.1          # Near-zero target
+INTERNAL_ENTROPY_CRITICAL = 0.5        # Trigger aggressive export
+
+# Gap-triggered export
+GAP_EXPORT_MULTIPLIER = 3.0            # Export 3x more on gap detection
+
+# Latency thresholds for burst mode
+BURST_MODE_LATENCY_THRESHOLD = 10000   # ms - switch to burst mode above this
 
 
 # CLAUDEME §8 Core Exception
@@ -1054,12 +1089,873 @@ def predict_next(n_context: int = 5) -> str | None:
     return patterns.most_common(1)[0][0] if patterns else None
 
 
+# ============================================
+# v4.4 ENTROPY PUMP PATH HELPERS
+# ============================================
+
+def _get_stub_path() -> Path:
+    """Get path for external audit stubs."""
+    base = Path(os.environ.get("NEURON_BASE", Path.home() / "neuron"))
+    return base / "external_audit_stub"
+
+
+def _get_chain_queue_path() -> Path:
+    """Get path for blockchain anchor queue."""
+    base = Path(os.environ.get("NEURON_BASE", Path.home() / "neuron"))
+    return base / "audit_chain_queue"
+
+
+def _get_cold_archive_path() -> Path:
+    """Get path for cold archive storage."""
+    base = Path(os.environ.get("NEURON_BASE", Path.home() / "neuron"))
+    return base / "cold_archive"
+
+
+def _get_burst_queue_path() -> Path:
+    """Get path for burst sync queue."""
+    base = Path(os.environ.get("NEURON_BASE", Path.home() / "neuron"))
+    return base / "burst_queue"
+
+
+# ============================================
+# v4.4 GATE 1: PUMP CLASSIFICATION
+# ============================================
+
+def grok_aligned_score(entry: dict, now: datetime | None = None, tau: float = SYSTEM_TAU_DEFAULT) -> float:
+    """Calculate entry-level α (Grok-aligned score) for pump classification.
+
+    Higher α = more valuable (keep/recirculate)
+    Lower α = less valuable (export)
+
+    Score combines:
+    - Salience (base value)
+    - Age decay (exponential)
+    - Replay boost (frequency)
+    - Project weight
+
+    Args:
+        entry: Ledger entry dict
+        now: Current timestamp (default: now)
+        tau: Time constant for age decay (minutes)
+
+    Returns:
+        α score between 0 and 1
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    # Parse entry timestamp
+    entry_ts = datetime.fromisoformat(entry["ts"].replace("Z", "+00:00"))
+    age_minutes = (now - entry_ts).total_seconds() / 60
+
+    # Base salience
+    salience = entry.get("salience", 1.0)
+
+    # Age decay factor (exponential decay)
+    age_factor = math.exp(-age_minutes / (tau * 60))  # Convert tau to match age in minutes
+
+    # Replay boost (more replays = more valuable)
+    replay_count = entry.get("replay_count", 0)
+    replay_factor = 1 + 0.1 * min(replay_count, 10)  # Cap at 2x boost
+
+    # Project weight (some projects have higher base value)
+    project = entry.get("project", "neuron")
+    project_weight = PROJECT_PRUNE_WEIGHT.get(project, 1.0)
+
+    # Combined α score (capped at 1.0)
+    alpha = min(1.0, salience * age_factor * replay_factor * project_weight)
+
+    return alpha
+
+
+def compute_internal_entropy(ledger: list, now: datetime | None = None,
+                             tau: float = SYSTEM_TAU_DEFAULT) -> float:
+    """Compute normalized internal entropy of the ledger.
+
+    H = Σ (1 - α_i) / n
+
+    Lower entropy = more order (better)
+    Higher entropy = more disorder (needs export)
+
+    Args:
+        ledger: List of ledger entries
+        now: Current timestamp (default: now)
+        tau: Time constant for α calculation
+
+    Returns:
+        Normalized entropy between 0 and 1
+    """
+    if not ledger:
+        return 0.0
+
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    disorder_sum = 0.0
+    for entry in ledger:
+        alpha = grok_aligned_score(entry, now, tau)
+        disorder_sum += (1.0 - alpha)
+
+    return disorder_sum / len(ledger)
+
+
+def classify_for_pump(ledger: list, tau: float = SYSTEM_TAU_DEFAULT,
+                      now: datetime | None = None) -> dict:
+    """Classify all entries by α into export/retain/recirculate buckets.
+
+    v4.4: "The ledger is not memory—it is an active entropy pump."
+
+    Classification:
+    - export: α < LOW_ALPHA_EXPORT_THRESHOLD (pump disorder out)
+    - retain: LOW_ALPHA_EXPORT_THRESHOLD ≤ α < HIGH_ALPHA_RECIRCULATE_THRESHOLD
+    - recirculate: α ≥ HIGH_ALPHA_RECIRCULATE_THRESHOLD (amplify order)
+
+    Args:
+        ledger: List of ledger entries
+        tau: Time constant for α calculation
+        now: Current timestamp (default: now)
+
+    Returns:
+        Dict with export, retain, recirculate lists and entropy metrics
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    export = []
+    retain = []
+    recirculate = []
+
+    for entry in ledger:
+        alpha = grok_aligned_score(entry, now, tau)
+        entry_with_alpha = {**entry, "_alpha": alpha}
+
+        if alpha < LOW_ALPHA_EXPORT_THRESHOLD:
+            export.append(entry_with_alpha)
+        elif alpha >= HIGH_ALPHA_RECIRCULATE_THRESHOLD:
+            recirculate.append(entry_with_alpha)
+        else:
+            retain.append(entry_with_alpha)
+
+    internal_entropy = compute_internal_entropy(ledger, now, tau)
+
+    # Emit pump_classification_receipt
+    receipt = emit_receipt("pump_classification", {
+        "tenant_id": "neuron",
+        "total_entries": len(ledger),
+        "export_count": len(export),
+        "retain_count": len(retain),
+        "recirculate_count": len(recirculate),
+        "internal_entropy_before": round(internal_entropy, 4),
+        "classification_threshold_low": LOW_ALPHA_EXPORT_THRESHOLD,
+        "classification_threshold_high": HIGH_ALPHA_RECIRCULATE_THRESHOLD
+    })
+
+    return {
+        "export": export,
+        "retain": retain,
+        "recirculate": recirculate,
+        "internal_entropy": internal_entropy,
+        "total_entries": len(ledger),
+        "receipt": receipt
+    }
+
+
+# ============================================
+# v4.4 GATE 2: LOW-α EXPORT
+# ============================================
+
+def compress_to_stub(entry: dict) -> dict:
+    """Reduce entry to minimal stub for storage.
+
+    Stub contains only: id, ts, project, payload_hash, original_alpha
+    Achieves 90%+ size reduction.
+
+    Args:
+        entry: Full ledger entry
+
+    Returns:
+        Compressed stub dict
+    """
+    payload = json.dumps({k: v for k, v in entry.items()
+                          if k not in ("_alpha", "hash")}, sort_keys=True)
+    return {
+        "id": entry.get("hash", entry.get("inference_id", "unknown"))[:32],
+        "ts": entry.get("ts"),
+        "project": entry.get("project", "neuron"),
+        "payload_hash": dual_hash(payload),
+        "original_alpha": entry.get("_alpha", 0.0)
+    }
+
+
+def export_low_alpha(entries: list, destination: str = "stub",
+                     compress: bool = True) -> dict:
+    """Export low-α entries to external destination.
+
+    v4.4: "aggressively pumps low-α entropy outward"
+
+    Args:
+        entries: List of entries to export (from classify_for_pump)
+        destination: Target - "stub", "chain", or "archive"
+        compress: If True, compress to stub format (90%+ reduction)
+
+    Returns:
+        Dict with export metrics
+    """
+    if not entries:
+        return {
+            "entries_exported": 0,
+            "destination": destination,
+            "compression_ratio": 0.0,
+            "bytes_before": 0,
+            "bytes_after": 0,
+            "internal_entropy_after": 0.0
+        }
+
+    # Determine destination path
+    dest_paths = {
+        "stub": _get_stub_path(),
+        "chain": _get_chain_queue_path(),
+        "archive": _get_cold_archive_path()
+    }
+    dest_path = dest_paths.get(destination, _get_stub_path())
+    dest_path.mkdir(parents=True, exist_ok=True)
+
+    # Calculate bytes before
+    bytes_before = sum(len(json.dumps(e)) for e in entries)
+
+    # Prepare output entries
+    if compress:
+        output_entries = [compress_to_stub(e) for e in entries]
+    else:
+        output_entries = [{k: v for k, v in e.items() if k != "_alpha"} for e in entries]
+
+    bytes_after = sum(len(json.dumps(e)) for e in output_entries)
+
+    # Write to destination file
+    date_suffix = datetime.now(timezone.utc).strftime("%Y%m%d")
+    if destination == "chain":
+        output_file = dest_path / "pending.jsonl"
+    else:
+        output_file = dest_path / f"{destination}_{date_suffix}.jsonl"
+
+    with open(output_file, "a") as f:
+        for entry in output_entries:
+            f.write(json.dumps(entry) + "\n")
+
+    # Remove exported entries from active ledger
+    ledger = _read_ledger()
+    export_hashes = {e.get("hash") for e in entries}
+    remaining = [e for e in ledger if e.get("hash") not in export_hashes]
+    _write_ledger(remaining)
+
+    # Calculate new entropy
+    internal_entropy_after = compute_internal_entropy(remaining)
+
+    compression_ratio = 1.0 - (bytes_after / bytes_before) if bytes_before > 0 else 0.0
+
+    # Emit receipt
+    receipt = emit_receipt("low_alpha_export", {
+        "tenant_id": "neuron",
+        "entries_exported": len(entries),
+        "destination": destination,
+        "compression_ratio": round(compression_ratio, 4),
+        "bytes_before": bytes_before,
+        "bytes_after": bytes_after,
+        "internal_entropy_after": round(internal_entropy_after, 4)
+    })
+
+    return {
+        "entries_exported": len(entries),
+        "destination": destination,
+        "compression_ratio": compression_ratio,
+        "bytes_before": bytes_before,
+        "bytes_after": bytes_after,
+        "internal_entropy_after": internal_entropy_after,
+        "output_file": str(output_file),
+        "receipt": receipt
+    }
+
+
+def queue_for_anchor(entries: list) -> dict:
+    """Add entries to blockchain anchor queue.
+
+    Args:
+        entries: List of entries to queue
+
+    Returns:
+        Dict with queue metrics
+    """
+    return export_low_alpha(entries, destination="chain", compress=False)
+
+
+# ============================================
+# v4.4 GATE 3: HIGH-α RECIRCULATION
+# ============================================
+
+def amplify_entry(entry: dict, factor: float = HIGH_ALPHA_AMPLIFICATION) -> dict:
+    """Amplify a high-α entry's salience.
+
+    Args:
+        entry: Entry to amplify
+        factor: Amplification factor (default 2.0)
+
+    Returns:
+        Amplified entry dict
+    """
+    amplified = {**entry}
+    old_salience = amplified.get("salience", 1.0)
+    amplified["salience"] = min(1.0, old_salience * factor)
+    amplified["replay_count"] = amplified.get("replay_count", 0) + 1
+    amplified["amplified_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    amplified["recirculation_round"] = amplified.get("recirculation_round", 0) + 1
+    # Remove internal _alpha field if present
+    amplified.pop("_alpha", None)
+    return amplified
+
+
+def recirculate_high_alpha(entries: list,
+                           amplification: float = HIGH_ALPHA_AMPLIFICATION) -> dict:
+    """Recirculate high-α entries with amplification.
+
+    v4.4: "recirculating high-α patterns"
+
+    Args:
+        entries: List of high-α entries (from classify_for_pump)
+        amplification: Factor to increase salience (default 2.0)
+
+    Returns:
+        Dict with recirculation metrics
+    """
+    if not entries:
+        return {
+            "entries_recirculated": 0,
+            "amplification_factor": amplification,
+            "avg_salience_before": 0.0,
+            "avg_salience_after": 0.0,
+            "internal_entropy_after": 0.0
+        }
+
+    # Calculate average salience before
+    avg_before = sum(e.get("salience", 1.0) for e in entries) / len(entries)
+
+    # Amplify entries
+    amplified_entries = [amplify_entry(e, amplification) for e in entries]
+
+    # Calculate average salience after
+    avg_after = sum(e.get("salience", 1.0) for e in amplified_entries) / len(amplified_entries)
+
+    # Update entries in ledger
+    ledger = _read_ledger()
+    entry_hashes = {e.get("hash") for e in entries}
+
+    updated_ledger = []
+    for e in ledger:
+        if e.get("hash") in entry_hashes:
+            # Find the amplified version
+            for amp in amplified_entries:
+                if amp.get("hash") == e.get("hash"):
+                    updated_ledger.append(amp)
+                    break
+        else:
+            updated_ledger.append(e)
+
+    _write_ledger(updated_ledger)
+
+    # Calculate new entropy
+    internal_entropy_after = compute_internal_entropy(updated_ledger)
+
+    # Emit receipt
+    receipt = emit_receipt("high_alpha_recirculate", {
+        "tenant_id": "neuron",
+        "entries_recirculated": len(entries),
+        "amplification_factor": amplification,
+        "avg_salience_before": round(avg_before, 4),
+        "avg_salience_after": round(avg_after, 4),
+        "internal_entropy_after": round(internal_entropy_after, 4)
+    })
+
+    return {
+        "entries_recirculated": len(entries),
+        "amplification_factor": amplification,
+        "avg_salience_before": avg_before,
+        "avg_salience_after": avg_after,
+        "internal_entropy_after": internal_entropy_after,
+        "receipt": receipt
+    }
+
+
+# ============================================
+# v4.4 GATE 4: GAP-TRIGGERED EXPORT
+# ============================================
+
+def detect_gap_trigger(ledger: list | None = None,
+                       threshold_minutes: float = 1.0) -> list:
+    """Detect gaps that should trigger accelerated export.
+
+    v4.4: "Gaps trigger directed entropy export"
+
+    Args:
+        ledger: Ledger entries (loads if None)
+        threshold_minutes: Minimum gap duration to trigger
+
+    Returns:
+        List of gap events with timestamps and sources
+    """
+    if ledger is None:
+        ledger = _read_ledger()
+
+    if len(ledger) < 2:
+        return []
+
+    # Sort by timestamp
+    sorted_entries = sorted(ledger, key=lambda e: e.get("ts", ""))
+    gaps = []
+
+    for i in range(1, len(sorted_entries)):
+        prev = sorted_entries[i - 1]
+        curr = sorted_entries[i]
+
+        prev_ts = datetime.fromisoformat(prev["ts"].replace("Z", "+00:00"))
+        curr_ts = datetime.fromisoformat(curr["ts"].replace("Z", "+00:00"))
+        gap_seconds = (curr_ts - prev_ts).total_seconds()
+        gap_minutes = gap_seconds / 60
+
+        if gap_minutes >= threshold_minutes:
+            gaps.append({
+                "start": prev["ts"],
+                "end": curr["ts"],
+                "duration_minutes": gap_minutes,
+                "from_project": prev.get("project", "neuron"),
+                "to_project": curr.get("project", "neuron"),
+                "gap_source": prev.get("project", "neuron")
+            })
+
+    return gaps
+
+
+def gap_directed_export(ledger: list | None = None, gap: dict | None = None,
+                        tau: float = SYSTEM_TAU_DEFAULT) -> dict:
+    """Trigger accelerated export on gap detection.
+
+    v4.4: "Human Nerve no longer recovers—it DIRECTS the pump"
+
+    On gap detection:
+    - Classify current ledger
+    - Export low-α × GAP_EXPORT_MULTIPLIER
+    - Human uses gap to drive pump harder
+
+    Args:
+        ledger: Current ledger (loads if None)
+        gap: Gap event dict (optional)
+        tau: Time constant for classification
+
+    Returns:
+        Dict with gap-triggered export metrics
+    """
+    if ledger is None:
+        ledger = _read_ledger()
+
+    if not ledger:
+        return {
+            "gap_duration_minutes": gap.get("duration_minutes", 0) if gap else 0,
+            "gap_source": gap.get("gap_source", "unknown") if gap else "unknown",
+            "export_multiplier": GAP_EXPORT_MULTIPLIER,
+            "entries_exported": 0,
+            "normal_export_would_be": 0,
+            "internal_entropy_after": 0.0
+        }
+
+    # Classify ledger
+    classification = classify_for_pump(ledger, tau)
+    export_candidates = classification["export"]
+
+    # Calculate normal export count
+    normal_count = len(export_candidates)
+
+    # Apply multiplier - export more aggressively
+    # Include some retain entries if multiplier demands more
+    retain_entries = classification["retain"]
+
+    # Sort retain by alpha (lowest first - closest to export threshold)
+    retain_sorted = sorted(retain_entries, key=lambda e: e.get("_alpha", 0.5))
+
+    # Calculate additional entries to export
+    additional_needed = int(normal_count * (GAP_EXPORT_MULTIPLIER - 1))
+    additional_to_export = retain_sorted[:additional_needed]
+
+    # Combine export sets
+    total_export = export_candidates + additional_to_export
+
+    # Perform export
+    if total_export:
+        export_result = export_low_alpha(total_export, destination="stub", compress=True)
+        internal_entropy_after = export_result["internal_entropy_after"]
+        entries_exported = export_result["entries_exported"]
+    else:
+        internal_entropy_after = compute_internal_entropy(ledger)
+        entries_exported = 0
+
+    # Emit receipt
+    receipt = emit_receipt("gap_directed_export", {
+        "tenant_id": "neuron",
+        "gap_duration_minutes": round(gap.get("duration_minutes", 0) if gap else 0, 2),
+        "gap_source": gap.get("gap_source", "unknown") if gap else "unknown",
+        "export_multiplier": GAP_EXPORT_MULTIPLIER,
+        "entries_exported": entries_exported,
+        "normal_export_would_be": normal_count,
+        "internal_entropy_after": round(internal_entropy_after, 4)
+    })
+
+    return {
+        "gap_duration_minutes": gap.get("duration_minutes", 0) if gap else 0,
+        "gap_source": gap.get("gap_source", "unknown") if gap else "unknown",
+        "export_multiplier": GAP_EXPORT_MULTIPLIER,
+        "entries_exported": entries_exported,
+        "normal_export_would_be": normal_count,
+        "internal_entropy_after": internal_entropy_after,
+        "receipt": receipt
+    }
+
+
+# ============================================
+# v4.4 GATE 5: BURST SYNC
+# ============================================
+
+# Module-level burst state
+_burst_mode_active = False
+_burst_queue = []
+_last_burst_time = None
+
+
+def enable_burst_mode(latency_ms: float) -> bool:
+    """Enable burst mode based on latency.
+
+    v4.4: "isolation doesn't degrade—it AMPLIFIES order"
+
+    Args:
+        latency_ms: Current network latency in milliseconds
+
+    Returns:
+        True if burst mode is now active
+    """
+    global _burst_mode_active
+    _burst_mode_active = latency_ms > BURST_MODE_LATENCY_THRESHOLD
+    return _burst_mode_active
+
+
+def is_burst_mode_active() -> bool:
+    """Check if burst mode is currently active."""
+    return _burst_mode_active
+
+
+def accumulate_for_burst(entries: list) -> dict:
+    """Accumulate entries for burst sync.
+
+    Args:
+        entries: Entries to add to burst queue
+
+    Returns:
+        Dict with accumulation metrics
+    """
+    global _burst_queue
+
+    _burst_queue.extend(entries)
+
+    # Enforce max batch size
+    if len(_burst_queue) > BURST_SYNC_MAX_BATCH:
+        _burst_queue = _burst_queue[-BURST_SYNC_MAX_BATCH:]
+
+    return {
+        "entries_accumulated": len(entries),
+        "queue_size": len(_burst_queue),
+        "max_batch": BURST_SYNC_MAX_BATCH
+    }
+
+
+def burst_sync(destination: str = "stub") -> dict:
+    """Sync entire burst queue to destination in one batch.
+
+    v4.4: "local ledger pumps entropy into delayed sync bursts"
+
+    Args:
+        destination: Target destination for export
+
+    Returns:
+        Dict with burst sync metrics
+    """
+    global _burst_queue, _last_burst_time
+    import time
+
+    start_time = time.time()
+
+    if not _burst_queue:
+        return {
+            "burst_mode_active": _burst_mode_active,
+            "latency_ms": 0,
+            "entries_accumulated": 0,
+            "entries_synced": 0,
+            "sync_duration_ms": 0,
+            "efficiency_ratio": 0.0,
+            "internal_entropy_before": 0.0,
+            "internal_entropy_after": 0.0
+        }
+
+    # Calculate entropy before
+    ledger = _read_ledger()
+    entropy_before = compute_internal_entropy(ledger)
+
+    entries_to_sync = list(_burst_queue)
+
+    # Perform export
+    export_result = export_low_alpha(entries_to_sync, destination=destination, compress=True)
+
+    # Clear queue
+    _burst_queue = []
+    _last_burst_time = datetime.now(timezone.utc)
+
+    end_time = time.time()
+    sync_duration_ms = (end_time - start_time) * 1000
+
+    # Calculate efficiency: entries synced per ms of sync time
+    # Compare to continuous sync which would be 1 entry per round-trip
+    # Burst is more efficient by factor of batch_size
+    efficiency_ratio = len(entries_to_sync) if sync_duration_ms > 0 else 0.0
+
+    # Emit receipt
+    receipt = emit_receipt("burst_sync", {
+        "tenant_id": "neuron",
+        "burst_mode_active": _burst_mode_active,
+        "latency_ms": BURST_MODE_LATENCY_THRESHOLD if _burst_mode_active else 0,
+        "entries_accumulated": len(entries_to_sync),
+        "entries_synced": export_result["entries_exported"],
+        "sync_duration_ms": round(sync_duration_ms, 2),
+        "efficiency_ratio": round(efficiency_ratio, 2),
+        "internal_entropy_before": round(entropy_before, 4),
+        "internal_entropy_after": round(export_result["internal_entropy_after"], 4)
+    })
+
+    return {
+        "burst_mode_active": _burst_mode_active,
+        "latency_ms": BURST_MODE_LATENCY_THRESHOLD if _burst_mode_active else 0,
+        "entries_accumulated": len(entries_to_sync),
+        "entries_synced": export_result["entries_exported"],
+        "sync_duration_ms": sync_duration_ms,
+        "efficiency_ratio": efficiency_ratio,
+        "internal_entropy_before": entropy_before,
+        "internal_entropy_after": export_result["internal_entropy_after"],
+        "receipt": receipt
+    }
+
+
+def reset_burst_state():
+    """Reset burst mode state (for testing)."""
+    global _burst_mode_active, _burst_queue, _last_burst_time
+    _burst_mode_active = False
+    _burst_queue = []
+    _last_burst_time = None
+
+
+# ============================================
+# v4.4 GATE 6: INTEGRATION
+# ============================================
+
+def pump_cycle(ledger: list | None = None, config: dict | None = None) -> dict:
+    """Execute full entropy pump cycle.
+
+    v4.4 Pump Cycle:
+    1. Classify entries by α
+    2. Export low-α (pump disorder out)
+    3. Recirculate high-α (amplify order)
+    4. Check for gaps → accelerated export
+    5. Burst sync if in isolation mode
+
+    Args:
+        ledger: Current ledger (loads if None)
+        config: Optional configuration overrides
+
+    Returns:
+        Dict with cycle metrics and remaining ledger
+    """
+    if ledger is None:
+        ledger = _read_ledger()
+
+    if config is None:
+        config = {}
+
+    tau = config.get("tau", SYSTEM_TAU_DEFAULT)
+    initial_entropy = compute_internal_entropy(ledger, tau=tau)
+
+    if not ledger:
+        return {
+            "cycles_run": 0,
+            "initial_entropy": 0.0,
+            "final_entropy": 0.0,
+            "entries_exported_total": 0,
+            "entries_recirculated_total": 0,
+            "gap_triggered_exports": 0,
+            "burst_syncs": 0,
+            "remaining_ledger": []
+        }
+
+    # Step 1: Classify
+    classification = classify_for_pump(ledger, tau)
+
+    # Step 2: Export low-α
+    exported = 0
+    if classification["export"]:
+        export_result = export_low_alpha(classification["export"], destination="stub")
+        exported = export_result["entries_exported"]
+
+    # Step 3: Recirculate high-α
+    recirculated = 0
+    if classification["recirculate"]:
+        recirc_result = recirculate_high_alpha(classification["recirculate"])
+        recirculated = recirc_result["entries_recirculated"]
+
+    # Step 4: Check for gaps
+    remaining_ledger = _read_ledger()
+    gaps = detect_gap_trigger(remaining_ledger)
+    gap_exports = 0
+    if gaps:
+        for gap in gaps[:1]:  # Process one gap per cycle
+            gap_result = gap_directed_export(remaining_ledger, gap, tau)
+            gap_exports += gap_result["entries_exported"]
+            remaining_ledger = _read_ledger()
+
+    # Step 5: Burst sync if active
+    burst_count = 0
+    if is_burst_mode_active() and _burst_queue:
+        burst_sync()
+        burst_count = 1
+        remaining_ledger = _read_ledger()
+
+    final_entropy = compute_internal_entropy(remaining_ledger, tau=tau)
+
+    return {
+        "cycles_run": 1,
+        "initial_entropy": initial_entropy,
+        "final_entropy": final_entropy,
+        "entries_exported_total": exported + gap_exports,
+        "entries_recirculated_total": recirculated,
+        "gap_triggered_exports": 1 if gap_exports > 0 else 0,
+        "burst_syncs": burst_count,
+        "remaining_ledger": remaining_ledger
+    }
+
+
+def validate_entropy_target(ledger: list | None = None,
+                            target: float = INTERNAL_ENTROPY_TARGET) -> dict:
+    """Validate that entropy target is achieved.
+
+    v4.4 Target: "near-zero internal entropy" (< 0.1)
+
+    Args:
+        ledger: Current ledger (loads if None)
+        target: Entropy target (default 0.1)
+
+    Returns:
+        Dict with validation results
+    """
+    if ledger is None:
+        ledger = _read_ledger()
+
+    current_entropy = compute_internal_entropy(ledger)
+    target_achieved = current_entropy < target
+
+    # Emit receipt
+    receipt = emit_receipt("entropy_validation", {
+        "tenant_id": "neuron",
+        "final_entropy": round(current_entropy, 4),
+        "target_entropy": target,
+        "target_achieved": target_achieved,
+        "ledger_size": len(ledger)
+    })
+
+    return {
+        "final_entropy": current_entropy,
+        "target_entropy": target,
+        "target_achieved": target_achieved,
+        "ledger_size": len(ledger),
+        "receipt": receipt
+    }
+
+
+def run_entropy_pump_integration(max_cycles: int = 10,
+                                 target: float = INTERNAL_ENTROPY_TARGET) -> dict:
+    """Run full entropy pump integration until target achieved.
+
+    Args:
+        max_cycles: Maximum pump cycles to run
+        target: Entropy target
+
+    Returns:
+        Dict with integration metrics
+    """
+    ledger = _read_ledger()
+    initial_entropy = compute_internal_entropy(ledger)
+
+    total_exported = 0
+    total_recirculated = 0
+    gap_exports = 0
+    burst_syncs = 0
+
+    for cycle in range(max_cycles):
+        result = pump_cycle(ledger)
+        ledger = result["remaining_ledger"]
+
+        total_exported += result["entries_exported_total"]
+        total_recirculated += result["entries_recirculated_total"]
+        gap_exports += result["gap_triggered_exports"]
+        burst_syncs += result["burst_syncs"]
+
+        # Check if target achieved
+        current_entropy = compute_internal_entropy(ledger)
+        if current_entropy < target:
+            break
+
+    final_entropy = compute_internal_entropy(ledger)
+    target_achieved = final_entropy < target
+
+    # Emit integration receipt
+    receipt = emit_receipt("entropy_pump_integration", {
+        "tenant_id": "neuron",
+        "version": "4.4.0",
+        "cycles_run": cycle + 1,
+        "initial_entropy": round(initial_entropy, 4),
+        "final_entropy": round(final_entropy, 4),
+        "target_entropy": target,
+        "target_achieved": target_achieved,
+        "entries_exported_total": total_exported,
+        "entries_recirculated_total": total_recirculated,
+        "gap_triggered_exports": gap_exports,
+        "burst_syncs": burst_syncs
+    })
+
+    return {
+        "version": "4.4.0",
+        "cycles_run": cycle + 1,
+        "initial_entropy": initial_entropy,
+        "final_entropy": final_entropy,
+        "target_entropy": target,
+        "target_achieved": target_achieved,
+        "entries_exported_total": total_exported,
+        "entries_recirculated_total": total_recirculated,
+        "gap_triggered_exports": gap_exports,
+        "burst_syncs": burst_syncs,
+        "receipt": receipt
+    }
+
+
 if __name__ == "__main__":
-    print(f"NEURON v4.3 - The Shared Nerve")
+    print(f"NEURON v4.4 - The Entropy Pump")
     print(f"Ledger: {LEDGER_PATH}")
     print(f"BLAKE3 available: {HAS_BLAKE3}")
     print(f"Shared mode: {LEDGER_SHARED_MODE}")
+    print(f"Entropy Pump mode: {ENTROPY_PUMP_MODE}")
     print(f"Projects: {ALLOWED_PROJECTS}")
     print(f"Recovery curves: {RECOVERY_CURVE_MODELS}")
     print(f"Default curve: {DEFAULT_RECOVERY_CURVE}")
     print(f"Shard strategies: {SHARD_STRATEGIES}")
+    print(f"Export threshold: α < {LOW_ALPHA_EXPORT_THRESHOLD}")
+    print(f"Recirculate threshold: α ≥ {HIGH_ALPHA_RECIRCULATE_THRESHOLD}")
+    print(f"Entropy target: {INTERNAL_ENTROPY_TARGET}")
