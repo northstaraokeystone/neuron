@@ -23,11 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from stress import (
     swarm_test,
     high_stress_test,
-    SWARM_DEFAULT_AGENTS,
-    SWARM_APPEND_PER_AGENT,
     SWARM_CONFLICT_THRESHOLD,
-    HIGH_STRESS_APPEND_TARGET,
-    HIGH_STRESS_WORKERS,
     _get_stress_receipts_path,
 )
 

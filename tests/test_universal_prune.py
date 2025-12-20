@@ -21,10 +21,8 @@ from neuron import (
     prune,
     load_ledger,
     universal_score,
-    alpha_system_wide,
     _write_ledger,
     PROJECT_PRUNE_WEIGHT,
-    SYSTEM_GAP_WEIGHT,
 )
 
 
@@ -62,7 +60,7 @@ def create_old_entry(project: str, age_days: float, salience: float = 1.0) -> di
         "inference_id": None,
         "context_summary": "",
         "source_context": {},
-        "hash": f"test_hash_{project}_{ts.timestamp()}"
+        "hash": f"test_hash_{project}_{ts.timestamp()}",
     }
 
 
@@ -122,7 +120,9 @@ class TestPruneUniversalMode:
         entries = []
         for project in ["human", "grok", "agentproof", "axiom"]:
             for i in range(10):
-                entries.append(create_old_entry(project, 40 + i, 0.01))  # Old (40+ days), very low salience
+                entries.append(
+                    create_old_entry(project, 40 + i, 0.01)
+                )  # Old (40+ days), very low salience
 
         _write_ledger(entries)
 
@@ -183,7 +183,9 @@ class TestLowAlphaEntriesPrunedFirst:
 
         _write_ledger([high_sal, low_sal])
 
-        result = prune(max_entries=1, max_age_days=10, salience_threshold=0.5, universal=True)
+        result = prune(
+            max_entries=1, max_age_days=10, salience_threshold=0.5, universal=True
+        )
         final_ledger = load_ledger()
 
         # High salience entry should be preserved

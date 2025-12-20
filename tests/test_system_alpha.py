@@ -5,7 +5,6 @@ Tests for unified gap detection and system-wide α calculation.
 
 import os
 import tempfile
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -18,13 +17,11 @@ os.environ["NEURON_ARCHIVE"] = str(Path(_test_dir) / "test_archive.jsonl")
 os.environ["NEURON_RECEIPTS"] = str(Path(_test_dir) / "test_stress_receipts.jsonl")
 
 from neuron import (
-    append,
     detect_system_gaps,
     weighted_gap,
     alpha_system_wide,
     alpha_by_project,
     emit_system_alpha_receipt,
-    load_ledger,
     _write_ledger,
     SYSTEM_GAP_WEIGHT,
 )
@@ -58,7 +55,7 @@ def create_entry_with_ts(project: str, ts: datetime) -> dict:
         "inference_id": None,
         "context_summary": "",
         "source_context": {},
-        "hash": f"test_hash_{project}_{ts.timestamp()}"
+        "hash": f"test_hash_{project}_{ts.timestamp()}",
     }
 
 
@@ -139,7 +136,9 @@ class TestWeightedGapAI:
     def test_weighted_gap_agentproof(self):
         """Test AgentProof gaps use weight 0.6."""
         gap = weighted_gap(60.0, "agentproof", "agentproof")
-        expected = 60.0 * SYSTEM_GAP_WEIGHT["agentproof"] * SYSTEM_GAP_WEIGHT["agentproof"]
+        expected = (
+            60.0 * SYSTEM_GAP_WEIGHT["agentproof"] * SYSTEM_GAP_WEIGHT["agentproof"]
+        )
         assert gap == expected
         assert gap < 60.0 * 0.8 * 0.8  # Should be less than grok
 

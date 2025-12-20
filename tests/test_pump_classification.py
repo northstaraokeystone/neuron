@@ -16,7 +16,6 @@ os.environ["NEURON_BASE"] = _test_dir
 import pytest
 from datetime import datetime, timezone, timedelta
 
-import neuron
 from neuron import (
     classify_for_pump,
     compute_internal_entropy,
@@ -58,12 +57,14 @@ class TestClassifyLowAlpha:
             project="neuron",
             task="low priority",
             next_action="maybe later",
-            salience=0.1  # Low salience
+            salience=0.1,  # Low salience
         )
 
         # Age it significantly
         ledger = load_ledger()
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         ledger[0]["ts"] = old_ts
         _write_ledger(ledger)
 
@@ -85,7 +86,7 @@ class TestClassifyHighAlpha:
             project="human",  # Higher project weight
             task="critical task",
             next_action="do immediately",
-            salience=1.0  # Max salience
+            salience=1.0,  # Max salience
         )
 
         # Add replay count
@@ -111,14 +112,16 @@ class TestClassifyMidAlpha:
             project="neuron",
             task="normal task",
             next_action="process later",
-            salience=0.5  # Medium salience
+            salience=0.5,  # Medium salience
         )
 
         # Classify
         result = classify_for_pump(load_ledger(), tau=SYSTEM_TAU_DEFAULT)
 
         # At least one bucket should have entries
-        total = len(result["export"]) + len(result["retain"]) + len(result["recirculate"])
+        total = (
+            len(result["export"]) + len(result["retain"]) + len(result["recirculate"])
+        )
         assert total == 1
 
 
@@ -133,7 +136,7 @@ class TestEntropyCalculation:
                 project="neuron",
                 task=f"task {i}",
                 next_action="process",
-                salience=i / 10.0  # 0.0 to 0.9
+                salience=i / 10.0,  # 0.0 to 0.9
             )
 
         ledger = load_ledger()
@@ -154,10 +157,7 @@ class TestClassificationReceipt:
         """classify_for_pump should emit receipt with counts."""
         for i in range(5):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.5
+                project="neuron", task=f"task {i}", next_action="process", salience=0.5
             )
 
         result = classify_for_pump(load_ledger(), tau=SYSTEM_TAU_DEFAULT)
@@ -192,7 +192,7 @@ class TestGrokAlignedScore:
             "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "salience": 1.0,
             "replay_count": 0,
-            "project": "human"
+            "project": "human",
         }
 
         alpha = grok_aligned_score(entry)
@@ -202,12 +202,14 @@ class TestGrokAlignedScore:
 
     def test_old_low_salience_entry(self):
         """Old low-salience entry should have low α."""
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=60)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=60)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         entry = {
             "ts": old_ts,
             "salience": 0.1,
             "replay_count": 0,
-            "project": "grok"  # Lower project weight
+            "project": "grok",  # Lower project weight
         }
 
         alpha = grok_aligned_score(entry)
@@ -221,7 +223,7 @@ class TestGrokAlignedScore:
             "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "salience": 0.5,
             "replay_count": 0,
-            "project": "neuron"
+            "project": "neuron",
         }
 
         entry_replayed = {**entry_base, "replay_count": 10}

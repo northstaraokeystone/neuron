@@ -21,34 +21,18 @@ from neuron import (
     FAILURE_TYPES,
     DEFAULT_FAILURE_RATE,
     RECOVERY_SUCCESS_THRESHOLD,
-    SLO_APPEND_OVERHEAD_MAX,
-    SLO_APPEND_THROUGHPUT_MIN,
-    SLO_RECOVERY_RATE_MIN,
     SLO_PRUNING_COMPRESSION_MIN,
     SLO_CONTEXT_RESTORE_MAX_SECONDS,
-    STRESS_TEST_DEFAULT_N,
-    STRESS_TEST_CONCURRENT_WORKERS,
     STRESS_TEST_OVERHEAD_THRESHOLD,
     STRESS_TEST_THROUGHPUT_FLOOR,
-    LEDGER_PATH,
-    ARCHIVE_PATH,
     append,
     prune,
     sync_ledger,
     replay_to_context,
     dual_hash,
     _read_ledger,
-    _write_ledger,
-    energy_estimate,
-    ALLOWED_PROJECTS,
-    SUPPORTED_MODELS,
     MAX_TASK_LEN,
     MAX_NEXT_LEN,
-    # v4.3 additions
-    load_ledger,
-    detect_system_gaps,
-    alpha_system_wide,
-    alpha_by_project,
 )
 
 # v4.2: Swarm and high-stress constants
@@ -61,10 +45,15 @@ HIGH_STRESS_ENTRIES = 10_000_000
 HIGH_STRESS_WORKERS = 16
 HIGH_STRESS_OVERHEAD_MAX = 0.01
 
+
 # Receipt storage - use function for lazy evaluation (test compatibility)
 def _get_stress_receipts_path() -> Path:
-    return Path(os.environ.get("NEURON_STRESS_RECEIPTS",
-                               Path.home() / "neuron" / "stress_receipts.jsonl"))
+    return Path(
+        os.environ.get(
+            "NEURON_STRESS_RECEIPTS", Path.home() / "neuron" / "stress_receipts.jsonl"
+        )
+    )
+
 
 STRESS_RECEIPTS_PATH = _get_stress_receipts_path()
 
@@ -74,9 +63,11 @@ def _emit_receipt(receipt_type: str, data: dict) -> dict:
     receipt = {
         "type": receipt_type,
         "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        **data
+        **data,
     }
-    receipt["hash"] = dual_hash(json.dumps({k: v for k, v in receipt.items() if k != "hash"}, sort_keys=True))
+    receipt["hash"] = dual_hash(
+        json.dumps({k: v for k, v in receipt.items() if k != "hash"}, sort_keys=True)
+    )
     receipts_path = _get_stress_receipts_path()
     receipts_path.parent.mkdir(parents=True, exist_ok=True)
     with open(receipts_path, "a") as f:
@@ -92,7 +83,9 @@ def _batch_create_entries(n: int, worker_id: int, batch_size: int = 1000) -> lis
     for i in range(n):
         task = f"stress_w{worker_id}_e{i}"[:MAX_TASK_LEN]
         next_action = f"next_{i}"[:MAX_NEXT_LEN]
-        token_count = 100 + (i * 97) % 9900  # Deterministic pseudo-random, avoids random() overhead
+        token_count = (
+            100 + (i * 97) % 9900
+        )  # Deterministic pseudo-random, avoids random() overhead
 
         entry = {
             "ts": ts_base.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -106,9 +99,11 @@ def _batch_create_entries(n: int, worker_id: int, batch_size: int = 1000) -> lis
             "energy": 1.0,  # Pre-computed default
             "token_count": token_count,
             "inference_id": None,
-            "context_summary": ""
+            "context_summary": "",
         }
-        entry["hash"] = dual_hash(json.dumps({k: v for k, v in entry.items() if k != "hash"}, sort_keys=True))
+        entry["hash"] = dual_hash(
+            json.dumps({k: v for k, v in entry.items() if k != "hash"}, sort_keys=True)
+        )
         entries.append(entry)
 
     return entries
@@ -121,7 +116,9 @@ def _batch_write_entries(ledger_path: Path, entries: list) -> None:
         f.write("\n".join(json.dumps(e) for e in entries) + "\n")
 
 
-def stress_test(n_entries: int = 10000, concurrent: int = 4, tau: float = DEFAULT_RECOVERY_TAU) -> dict:
+def stress_test(
+    n_entries: int = 10000, concurrent: int = 4, tau: float = DEFAULT_RECOVERY_TAU
+) -> dict:
     """Benchmark append performance at scale (optimized with batch writes).
 
     Args:
@@ -137,6 +134,7 @@ def stress_test(n_entries: int = 10000, concurrent: int = 4, tau: float = DEFAUL
     test_archive = Path(temp_dir) / "stress_test_archive.jsonl"
 
     import neuron
+
     original_ledger = neuron.LEDGER_PATH
     original_archive = neuron.ARCHIVE_PATH
 
@@ -181,7 +179,9 @@ def stress_test(n_entries: int = 10000, concurrent: int = 4, tau: float = DEFAUL
 
         # Overhead: write time per 1000 entries (ms) - batch mode metric
         # Target: <10ms per 1000 entries = <0.01ms per entry = <1% overhead equivalent
-        write_ms_per_1k = (write_time * 1000) / (actual_entries / 1000) if actual_entries > 0 else 0
+        write_ms_per_1k = (
+            (write_time * 1000) / (actual_entries / 1000) if actual_entries > 0 else 0
+        )
         # Convert to percentage: 10ms/1k = 1%, so divide by 10
         overhead_pct = write_ms_per_1k / 10
 
@@ -192,8 +192,8 @@ def stress_test(n_entries: int = 10000, concurrent: int = 4, tau: float = DEFAUL
         final_entries = _read_ledger()
 
         slo_pass = (
-            append_rate >= STRESS_TEST_THROUGHPUT_FLOOR and
-            overhead_pct / 100 < STRESS_TEST_OVERHEAD_THRESHOLD
+            append_rate >= STRESS_TEST_THROUGHPUT_FLOOR
+            and overhead_pct / 100 < STRESS_TEST_OVERHEAD_THRESHOLD
         )
 
         result = {
@@ -207,7 +207,7 @@ def stress_test(n_entries: int = 10000, concurrent: int = 4, tau: float = DEFAUL
             "final_ledger_entries": len(final_entries),
             "pruning_compression_ratio": round(compression_ratio, 4),
             "tau_used": tau,
-            "slo_pass": slo_pass
+            "slo_pass": slo_pass,
         }
 
         _emit_receipt("stress_test_receipt", result)
@@ -221,8 +221,12 @@ def stress_test(n_entries: int = 10000, concurrent: int = 4, tau: float = DEFAUL
                 p.unlink()
 
 
-def inject_failure(failure_type: str = "timeout", rate: float = DEFAULT_FAILURE_RATE,
-                   duration_s: int = 10, operations: int = 100) -> dict:
+def inject_failure(
+    failure_type: str = "timeout",
+    rate: float = DEFAULT_FAILURE_RATE,
+    duration_s: int = 10,
+    operations: int = 100,
+) -> dict:
     """Inject failures during ledger operations (optimized with reduced sleep times)."""
     if failure_type not in FAILURE_TYPES:
         raise ValueError(f"failure_type must be one of: {FAILURE_TYPES}")
@@ -231,6 +235,7 @@ def inject_failure(failure_type: str = "timeout", rate: float = DEFAULT_FAILURE_
     test_ledger = Path(temp_dir) / "failure_test_receipts.jsonl"
 
     import neuron
+
     original_ledger = neuron.LEDGER_PATH
 
     # Pre-generate random decisions to avoid per-iteration overhead
@@ -265,16 +270,33 @@ def inject_failure(failure_type: str = "timeout", rate: float = DEFAULT_FAILURE_
                     if failure_type == "disconnect":
                         raise ConnectionError("Simulated disconnect")
                     elif failure_type == "corrupt":
-                        if "corrupted" != dual_hash("test")[:9]:  # Always true, validates hash path
-                            append("neuron", f"corrupt_recovery_{op_count}"[:50], "recovered", model="neuron")
+                        if (
+                            "corrupted" != dual_hash("test")[:9]
+                        ):  # Always true, validates hash path
+                            append(
+                                "neuron",
+                                f"corrupt_recovery_{op_count}"[:50],
+                                "recovered",
+                                model="neuron",
+                            )
                             successful_recoveries += 1
                     else:
-                        append("neuron", f"{failure_type}_recovery_{op_count}"[:50], "recovered", model="neuron")
+                        append(
+                            "neuron",
+                            f"{failure_type}_recovery_{op_count}"[:50],
+                            "recovered",
+                            model="neuron",
+                        )
                         successful_recoveries += 1
 
                 except (ConnectionError, IOError):
                     try:
-                        append("neuron", f"retry_recovery_{op_count}"[:50], "recovered", model="neuron")
+                        append(
+                            "neuron",
+                            f"retry_recovery_{op_count}"[:50],
+                            "recovered",
+                            model="neuron",
+                        )
                         successful_recoveries += 1
                     except Exception:
                         failed_recoveries += 1
@@ -284,15 +306,21 @@ def inject_failure(failure_type: str = "timeout", rate: float = DEFAULT_FAILURE_
                 recovery_times.append(time.perf_counter() - recovery_start)
             else:
                 try:
-                    append("neuron", f"normal_op_{op_count}"[:50], "next", model="neuron")
+                    append(
+                        "neuron", f"normal_op_{op_count}"[:50], "next", model="neuron"
+                    )
                 except Exception:
                     pass
 
         total_time = time.perf_counter() - start_time
         op_count = min(op_count, operations)
 
-        recovery_rate = successful_recoveries / failures_injected if failures_injected > 0 else 1.0
-        avg_recovery_ms = (sum(recovery_times) / len(recovery_times) * 1000) if recovery_times else 0
+        recovery_rate = (
+            successful_recoveries / failures_injected if failures_injected > 0 else 1.0
+        )
+        avg_recovery_ms = (
+            (sum(recovery_times) / len(recovery_times) * 1000) if recovery_times else 0
+        )
         max_recovery_ms = max(recovery_times) * 1000 if recovery_times else 0
 
         result = {
@@ -306,7 +334,7 @@ def inject_failure(failure_type: str = "timeout", rate: float = DEFAULT_FAILURE_
             "average_recovery_time_ms": round(avg_recovery_ms, 2),
             "max_recovery_time_ms": round(max_recovery_ms, 2),
             "duration_seconds": round(total_time, 3),
-            "slo_pass": recovery_rate >= RECOVERY_SUCCESS_THRESHOLD
+            "slo_pass": recovery_rate >= RECOVERY_SUCCESS_THRESHOLD,
         }
 
         _emit_receipt("failure_injection_receipt", result)
@@ -322,7 +350,9 @@ def concurrent_sync_test(n_workers: int = 4, n_entries_each: int = 100) -> dict:
     """Stress test multi-model sync (optimized with batch operations)."""
     temp_dir = tempfile.mkdtemp()
     shared_ledger = Path(temp_dir) / "shared_receipts.jsonl"
-    worker_ledgers = [Path(temp_dir) / f"worker_{i}_receipts.jsonl" for i in range(n_workers)]
+    worker_ledgers = [
+        Path(temp_dir) / f"worker_{i}_receipts.jsonl" for i in range(n_workers)
+    ]
 
     original_ledger_env = os.environ.get("NEURON_LEDGER", "")
 
@@ -330,6 +360,7 @@ def concurrent_sync_test(n_workers: int = 4, n_entries_each: int = 100) -> dict:
     lock = threading.Lock()
 
     try:
+
         def worker_task(worker_id: int) -> tuple:
             """Worker: batch create entries, write, then sync."""
             nonlocal conflicts_detected
@@ -353,7 +384,9 @@ def concurrent_sync_test(n_workers: int = 4, n_entries_each: int = 100) -> dict:
                 if shared_ledger.exists():
                     existing = _read_ledger()
                     seen_hashes = {e.get("hash") for e in existing}
-                    new_entries = [e for e in local_entries if e.get("hash") not in seen_hashes]
+                    new_entries = [
+                        e for e in local_entries if e.get("hash") not in seen_hashes
+                    ]
                     if new_entries:
                         _batch_write_entries(shared_ledger, new_entries)
                 else:
@@ -372,7 +405,9 @@ def concurrent_sync_test(n_workers: int = 4, n_entries_each: int = 100) -> dict:
 
         os.environ["NEURON_LEDGER"] = str(shared_ledger)
         final_entries = _read_ledger() if shared_ledger.exists() else []
-        final_hash = dual_hash(json.dumps([e.get("hash") for e in final_entries[:10]], sort_keys=True))
+        final_hash = dual_hash(
+            json.dumps([e.get("hash") for e in final_entries[:10]], sort_keys=True)
+        )
 
         total_entries = len(final_entries)
         expected_entries = n_workers * n_entries_each
@@ -388,7 +423,7 @@ def concurrent_sync_test(n_workers: int = 4, n_entries_each: int = 100) -> dict:
             "final_ledger_hash": final_hash[:32],
             "all_workers_consistent": total_entries >= expected_entries * 0.9,
             "total_time_seconds": round(total_time, 3),
-            "slo_pass": total_entries >= expected_entries * 0.9
+            "slo_pass": total_entries >= expected_entries * 0.9,
         }
 
         _emit_receipt("concurrent_sync_receipt", result)
@@ -401,9 +436,11 @@ def concurrent_sync_test(n_workers: int = 4, n_entries_each: int = 100) -> dict:
                 p.unlink()
 
 
-def swarm_test(n_agents: int = SWARM_DEFAULT_AGENTS,
-               appends_per_agent: int = SWARM_APPEND_PER_AGENT,
-               shard_count: int = 4) -> dict:
+def swarm_test(
+    n_agents: int = SWARM_DEFAULT_AGENTS,
+    appends_per_agent: int = SWARM_APPEND_PER_AGENT,
+    shard_count: int = 4,
+) -> dict:
     """
     Simulate 1000+ concurrent agents writing to sharded ledger.
 
@@ -425,7 +462,9 @@ def swarm_test(n_agents: int = SWARM_DEFAULT_AGENTS,
     conflicts = 0
     lock = threading.Lock()
 
-    ledger = ShardedLedger(shard_count=shard_count, strategy="hash", shard_dir=shard_dir)
+    ledger = ShardedLedger(
+        shard_count=shard_count, strategy="hash", shard_dir=shard_dir
+    )
 
     def agent_task(agent_id: int) -> tuple:
         """Single agent: append entries and return timing + count."""
@@ -447,9 +486,13 @@ def swarm_test(n_agents: int = SWARM_DEFAULT_AGENTS,
                 "energy": 1.0,
                 "token_count": 100 + (i * 97) % 9900,
                 "inference_id": inference_id,
-                "context_summary": ""
+                "context_summary": "",
             }
-            entry["hash"] = dual_hash(json.dumps({k: v for k, v in entry.items() if k != "hash"}, sort_keys=True))
+            entry["hash"] = dual_hash(
+                json.dumps(
+                    {k: v for k, v in entry.items() if k != "hash"}, sort_keys=True
+                )
+            )
 
             # Check for conflicts
             with lock:
@@ -468,7 +511,9 @@ def swarm_test(n_agents: int = SWARM_DEFAULT_AGENTS,
     total_entries = 0
     agent_times = []
 
-    with ThreadPoolExecutor(max_workers=min(n_agents, 100)) as executor:  # Cap at 100 threads
+    with ThreadPoolExecutor(
+        max_workers=min(n_agents, 100)
+    ) as executor:  # Cap at 100 threads
         futures = [executor.submit(agent_task, i) for i in range(n_agents)]
         for future in as_completed(futures):
             elapsed, count = future.result()
@@ -483,7 +528,10 @@ def swarm_test(n_agents: int = SWARM_DEFAULT_AGENTS,
 
     append_rate = total_entries / total_time if total_time > 0 else 0
 
-    slo_pass = conflicts <= SWARM_CONFLICT_THRESHOLD and append_rate >= HIGH_STRESS_APPEND_TARGET * 0.5
+    slo_pass = (
+        conflicts <= SWARM_CONFLICT_THRESHOLD
+        and append_rate >= HIGH_STRESS_APPEND_TARGET * 0.5
+    )
 
     result = {
         "n_agents": n_agents,
@@ -494,22 +542,25 @@ def swarm_test(n_agents: int = SWARM_DEFAULT_AGENTS,
         "conflicts": conflicts,
         "shards_used": shard_count,
         "entries_per_shard": entries_per_shard,
-        "avg_agent_time_ms": round(sum(agent_times) / len(agent_times) * 1000, 2) if agent_times else 0,
-        "slo_pass": slo_pass
+        "avg_agent_time_ms": round(sum(agent_times) / len(agent_times) * 1000, 2)
+        if agent_times
+        else 0,
+        "slo_pass": slo_pass,
     }
 
     _emit_receipt("swarm_test_receipt", result)
 
     # Cleanup
     import shutil
+
     shutil.rmtree(temp_dir, ignore_errors=True)
 
     return result
 
 
-def high_stress_test(n_entries: int = 1_000_000,
-                     shard_count: int = 4,
-                     workers: int = HIGH_STRESS_WORKERS) -> dict:
+def high_stress_test(
+    n_entries: int = 1_000_000, shard_count: int = 4, workers: int = HIGH_STRESS_WORKERS
+) -> dict:
     """
     Push beyond 85k/s with sharding.
 
@@ -526,7 +577,9 @@ def high_stress_test(n_entries: int = 1_000_000,
     temp_dir = tempfile.mkdtemp()
     shard_dir = Path(temp_dir) / "shards"
 
-    ledger = ShardedLedger(shard_count=shard_count, strategy="hash", shard_dir=shard_dir)
+    ledger = ShardedLedger(
+        shard_count=shard_count, strategy="hash", shard_dir=shard_dir
+    )
 
     entries_per_worker = n_entries // workers
     all_entries = []
@@ -567,9 +620,16 @@ def high_stress_test(n_entries: int = 1_000_000,
     entries_per_shard = [s["count"] for s in stats["shards"]]
 
     append_rate = total_entries / total_time if total_time > 0 else 0
-    overhead_pct = (sum(worker_times) / len(worker_times) / total_time * 100) if total_time > 0 else 0
+    overhead_pct = (
+        (sum(worker_times) / len(worker_times) / total_time * 100)
+        if total_time > 0
+        else 0
+    )
 
-    slo_pass = append_rate >= HIGH_STRESS_APPEND_TARGET and overhead_pct / 100 < HIGH_STRESS_OVERHEAD_MAX
+    slo_pass = (
+        append_rate >= HIGH_STRESS_APPEND_TARGET
+        and overhead_pct / 100 < HIGH_STRESS_OVERHEAD_MAX
+    )
 
     result = {
         "n_entries": total_entries,
@@ -580,13 +640,14 @@ def high_stress_test(n_entries: int = 1_000_000,
         "overhead_percent": round(overhead_pct, 3),
         "entries_per_shard": entries_per_shard,
         "evictions_triggered": evictions_triggered,
-        "slo_pass": slo_pass
+        "slo_pass": slo_pass,
     }
 
     _emit_receipt("high_stress_receipt", result)
 
     # Cleanup
     import shutil
+
     shutil.rmtree(temp_dir, ignore_errors=True)
 
     return result
@@ -604,8 +665,12 @@ def benchmark_report() -> dict:
     with ThreadPoolExecutor(max_workers=4) as executor:
         # Run stress test and failure tests in parallel
         stress_future = executor.submit(stress_test, n_entries=500, concurrent=2)
-        failure_futures = [executor.submit(run_failure_test, ft) for ft in FAILURE_TYPES]
-        sync_future = executor.submit(concurrent_sync_test, n_workers=2, n_entries_each=30)
+        failure_futures = [
+            executor.submit(run_failure_test, ft) for ft in FAILURE_TYPES
+        ]
+        sync_future = executor.submit(
+            concurrent_sync_test, n_workers=2, n_entries_each=30
+        )
 
         stress_result = stress_future.result()
         for future in as_completed(failure_futures):
@@ -615,6 +680,7 @@ def benchmark_report() -> dict:
 
     # Quick context restore test
     import neuron
+
     temp_dir = tempfile.mkdtemp()
     test_ledger = Path(temp_dir) / "restore_test.jsonl"
     original_ledger = neuron.LEDGER_PATH
@@ -632,39 +698,43 @@ def benchmark_report() -> dict:
         if test_ledger.exists():
             test_ledger.unlink()
 
-    avg_recovery_rate = sum(r["recovery_rate"] for r in failure_results.values()) / len(failure_results)
+    avg_recovery_rate = sum(r["recovery_rate"] for r in failure_results.values()) / len(
+        failure_results
+    )
 
     slos = {
         "append_overhead": {
             "target": f"<{STRESS_TEST_OVERHEAD_THRESHOLD * 100}%",
             "actual": f"{stress_result['overhead_percent']:.2f}%",
-            "pass": stress_result["overhead_percent"] / 100 < STRESS_TEST_OVERHEAD_THRESHOLD
+            "pass": stress_result["overhead_percent"] / 100
+            < STRESS_TEST_OVERHEAD_THRESHOLD,
         },
         "append_throughput": {
             "target": f">{STRESS_TEST_THROUGHPUT_FLOOR}/s",
             "actual": f"{stress_result['append_rate_per_second']:.0f}/s",
-            "pass": stress_result["append_rate_per_second"] > STRESS_TEST_THROUGHPUT_FLOOR
+            "pass": stress_result["append_rate_per_second"]
+            > STRESS_TEST_THROUGHPUT_FLOOR,
         },
         "recovery_rate": {
             "target": f">{RECOVERY_SUCCESS_THRESHOLD * 100}%",
             "actual": f"{avg_recovery_rate * 100:.1f}%",
-            "pass": avg_recovery_rate >= RECOVERY_SUCCESS_THRESHOLD
+            "pass": avg_recovery_rate >= RECOVERY_SUCCESS_THRESHOLD,
         },
         "pruning_compression": {
             "target": f">{SLO_PRUNING_COMPRESSION_MIN * 100}%",
             "actual": f"{stress_result['pruning_compression_ratio'] * 100:.1f}%",
-            "pass": True
+            "pass": True,
         },
         "context_restore": {
             "target": f"<{SLO_CONTEXT_RESTORE_MAX_SECONDS}s",
             "actual": f"{restore_time:.3f}s",
-            "pass": restore_time < SLO_CONTEXT_RESTORE_MAX_SECONDS
+            "pass": restore_time < SLO_CONTEXT_RESTORE_MAX_SECONDS,
         },
         "concurrent_consistency": {
             "target": "100%",
             "actual": "100%" if sync_result["all_workers_consistent"] else "<100%",
-            "pass": sync_result["all_workers_consistent"]
-        }
+            "pass": sync_result["all_workers_consistent"],
+        },
     }
 
     pass_count = sum(1 for s in slos.values() if s["pass"])
@@ -672,7 +742,9 @@ def benchmark_report() -> dict:
 
     recommendations = []
     if not slos["append_throughput"]["pass"]:
-        recommendations.append("Consider reducing concurrent workers or optimizing append path")
+        recommendations.append(
+            "Consider reducing concurrent workers or optimizing append path"
+        )
     if not slos["recovery_rate"]["pass"]:
         recommendations.append("Review failure handling and retry logic")
     if not slos["concurrent_consistency"]["pass"]:
@@ -688,24 +760,29 @@ def benchmark_report() -> dict:
         "recommendations": recommendations,
         "stress_test_summary": {
             "entries": stress_result["n_entries"],
-            "rate": stress_result["append_rate_per_second"]
+            "rate": stress_result["append_rate_per_second"],
         },
         "failure_test_summary": {
-            ftype: {"recovery_rate": r["recovery_rate"]} for ftype, r in failure_results.items()
+            ftype: {"recovery_rate": r["recovery_rate"]}
+            for ftype, r in failure_results.items()
         },
         "sync_test_summary": {
             "workers": sync_result["n_workers"],
-            "consistent": sync_result["all_workers_consistent"]
-        }
+            "consistent": sync_result["all_workers_consistent"],
+        },
     }
 
     _emit_receipt("benchmark_report_receipt", result)
     return result
 
 
-def triad_simulation(n_events: int = 500, project_weights: dict | None = None,
-                     include_gaps: bool = True, include_stress: bool = True,
-                     prune_threshold: int = 100) -> dict:
+def triad_simulation(
+    n_events: int = 500,
+    project_weights: dict | None = None,
+    include_gaps: bool = True,
+    include_stress: bool = True,
+    prune_threshold: int = 100,
+) -> dict:
     """Full triad simulation validating shared nerve behavior.
 
     v4.3: Simulates realistic triad activity with all projects.
@@ -728,6 +805,7 @@ def triad_simulation(n_events: int = 500, project_weights: dict | None = None,
     test_receipts = Path(temp_dir) / "triad_test_stress_receipts.jsonl"
 
     import neuron
+
     original_ledger = neuron.LEDGER_PATH
     original_archive = neuron.ARCHIVE_PATH
 
@@ -751,7 +829,7 @@ def triad_simulation(n_events: int = 500, project_weights: dict | None = None,
         neuron.append(
             project="neuron",
             task="Triad simulation boot",
-            next_action="generate_events"
+            next_action="generate_events",
         )
 
         # Phase 2: Activity - Generate mixed triad events
@@ -765,6 +843,7 @@ def triad_simulation(n_events: int = 500, project_weights: dict | None = None,
                 trigger_agentproof_rollback,
                 trigger_axiom_entropy_spike,
             )
+
             for i in range(min(12, n_events // 40)):
                 trigger_grok_eviction(5000 + i * 100, f"stress_test_{i}")
                 trigger_agentproof_rollback(f"0xstress{i:04x}", "stress_test")
@@ -789,8 +868,9 @@ def triad_simulation(n_events: int = 500, project_weights: dict | None = None,
             pre_prune_projects.add(e.get("project", "neuron"))
 
         # Check for AI auto-events BEFORE pruning
-        ai_auto_events = sum(1 for e in ledger
-                            if e.get("source_context", {}).get("trigger") == "auto")
+        ai_auto_events = sum(
+            1 for e in ledger if e.get("source_context", {}).get("trigger") == "auto"
+        )
 
         # Phase 6: Prune - Universal pruning to threshold
         prune_result = neuron.prune(max_entries=prune_threshold, universal=True)
@@ -813,19 +893,23 @@ def triad_simulation(n_events: int = 500, project_weights: dict | None = None,
 
         # Invariant checks
         # Check projects were GENERATED (pre-prune), not necessarily preserved
-        all_projects_present = len(pre_prune_projects) >= 4  # At least 4 projects generated
+        all_projects_present = (
+            len(pre_prune_projects) >= 4
+        )  # At least 4 projects generated
         alpha_reasonable = 0.0 <= system_alpha <= 10.0
         pruning_worked = final_size <= prune_threshold * 1.2  # Allow 20% buffer
         ai_events_present = ai_auto_events > 0
         continuity_maintained = max_gap_hours < 24  # No gaps > 24h
 
-        all_invariants_pass = all([
-            all_projects_present,
-            alpha_reasonable,
-            pruning_worked,
-            ai_events_present,
-            continuity_maintained
-        ])
+        all_invariants_pass = all(
+            [
+                all_projects_present,
+                alpha_reasonable,
+                pruning_worked,
+                ai_events_present,
+                continuity_maintained,
+            ]
+        )
 
         result = {
             "events_generated": n_events + 1 + stress_events,
@@ -845,8 +929,8 @@ def triad_simulation(n_events: int = 500, project_weights: dict | None = None,
                 "alpha_reasonable": alpha_reasonable,
                 "pruning_worked": pruning_worked,
                 "ai_events_present": ai_events_present,
-                "continuity_maintained": continuity_maintained
-            }
+                "continuity_maintained": continuity_maintained,
+            },
         }
 
         _emit_receipt("triad_simulation_receipt", result)
@@ -862,6 +946,7 @@ def triad_simulation(n_events: int = 500, project_weights: dict | None = None,
 
         # Cleanup
         import shutil
+
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
@@ -874,7 +959,9 @@ if __name__ == "__main__":
     elapsed = time.perf_counter() - start
     print(f"\nCompleted in {elapsed:.2f}s")
     print(f"Overall Status: {report['overall_status']}")
-    print(f"SLOs: {report['pass_count']}/{report['pass_count'] + report['fail_count']} passed")
+    print(
+        f"SLOs: {report['pass_count']}/{report['pass_count'] + report['fail_count']} passed"
+    )
     for name, slo in report["slos"].items():
         status = "PASS" if slo["pass"] else "FAIL"
         print(f"  {name}: {slo['actual']} (target: {slo['target']}) [{status}]")
@@ -882,5 +969,7 @@ if __name__ == "__main__":
     print("\n" + "=" * 55)
     print("Quick swarm test (10 agents)...")
     swarm_result = swarm_test(n_agents=10, appends_per_agent=10)
-    print(f"  Agents: {swarm_result['n_agents']}, Conflicts: {swarm_result['conflicts']}")
+    print(
+        f"  Agents: {swarm_result['n_agents']}, Conflicts: {swarm_result['conflicts']}"
+    )
     print(f"  Rate: {swarm_result['append_rate_per_second']:.0f}/s")

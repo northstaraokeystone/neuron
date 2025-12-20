@@ -176,7 +176,9 @@ class TestDurationLimits:
         import time
 
         start = time.time()
-        result = inject_failure(failure_type="timeout", rate=0.5, duration_s=2, operations=1000)
+        result = inject_failure(
+            failure_type="timeout", rate=0.5, duration_s=2, operations=1000
+        )
         elapsed = time.time() - start
 
         # Should complete within reasonable time of duration limit
@@ -193,6 +195,7 @@ class TestIsolation:
     def test_uses_isolated_ledger(self):
         """Test that inject_failure uses isolated ledger."""
         import neuron
+
         original_path = neuron.LEDGER_PATH
 
         inject_failure(failure_type="timeout", rate=0.1, operations=50)

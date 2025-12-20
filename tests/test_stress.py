@@ -28,8 +28,6 @@ from stress import (
     _get_stress_receipts_path,
 )
 from neuron import (
-    STRESS_TEST_THROUGHPUT_FLOOR,
-    STRESS_TEST_OVERHEAD_THRESHOLD,
     TAU_PRESETS,
 )
 
@@ -67,8 +65,12 @@ class TestStressTest:
 
     def test_stress_test_with_tau(self):
         """Test stress_test respects tau parameter."""
-        result_quick = stress_test(n_entries=50, concurrent=1, tau=TAU_PRESETS["quick_task"])
-        result_deep = stress_test(n_entries=50, concurrent=1, tau=TAU_PRESETS["deep_work"])
+        result_quick = stress_test(
+            n_entries=50, concurrent=1, tau=TAU_PRESETS["quick_task"]
+        )
+        result_deep = stress_test(
+            n_entries=50, concurrent=1, tau=TAU_PRESETS["deep_work"]
+        )
 
         assert result_quick["tau_used"] == TAU_PRESETS["quick_task"]
         assert result_deep["tau_used"] == TAU_PRESETS["deep_work"]
@@ -161,7 +163,7 @@ class TestBenchmarkReport:
             "recovery_rate",
             "pruning_compression",
             "context_restore",
-            "concurrent_consistency"
+            "concurrent_consistency",
         ]
 
         for slo_name in expected_slos:
@@ -250,6 +252,7 @@ class TestIntegration:
     def test_stress_isolation(self):
         """Test that stress tests use isolated ledgers."""
         import neuron
+
         original_path = neuron.LEDGER_PATH
 
         stress_test(n_entries=100, concurrent=2)

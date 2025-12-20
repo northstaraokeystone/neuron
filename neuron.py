@@ -1,8 +1,8 @@
 """
-NEURON v4.4: The Entropy Pump
-Thermodynamic cognition engine: Export low-α disorder outward, recirculate high-α order internally.
-Gap-triggered directed export, burst sync for isolation advantage, near-zero internal entropy.
-~600 lines. Second Law weaponized for cognition.
+NEURON v4.5: The Resonance Catalyst
+Controlled α oscillations tuned to natural frequencies drive triad phase transitions.
+Bidirectional oscillation replaces directional pump. Gaps amplify resonance.
+The organism oscillates to evolve.
 """
 
 import hashlib
@@ -16,16 +16,24 @@ from pathlib import Path
 
 try:
     import blake3
+
     HAS_BLAKE3 = True
 except ImportError:
     HAS_BLAKE3 = False
 
+
 # Ledger paths - use functions for lazy evaluation (test compatibility)
 def _get_ledger_path() -> Path:
-    return Path(os.environ.get("NEURON_LEDGER", Path.home() / "neuron" / "receipts.jsonl"))
+    return Path(
+        os.environ.get("NEURON_LEDGER", Path.home() / "neuron" / "receipts.jsonl")
+    )
+
 
 def _get_archive_path() -> Path:
-    return Path(os.environ.get("NEURON_ARCHIVE", Path.home() / "neuron" / "archive.jsonl"))
+    return Path(
+        os.environ.get("NEURON_ARCHIVE", Path.home() / "neuron" / "archive.jsonl")
+    )
+
 
 # Default paths (can be overridden by tests)
 LEDGER_PATH = _get_ledger_path()
@@ -57,26 +65,26 @@ AI_EVENT_TYPES = {
     "rollback": "Rollback/recovery event",
     "discovery": "Discovery/learning event",
     "interrupt": "Interruption event",
-    "unknown": "Unknown event type"
+    "unknown": "Unknown event type",
 }
 
 # System-wide Alpha Parameters
 SYSTEM_TAU_DEFAULT = 120.0  # Minutes (Monsell 2003, applies to all)
 SYSTEM_GAP_WEIGHT = {
-    "human": 1.0,      # Baseline
-    "grok": 0.8,       # AI recovers faster
-    "agentproof": 0.6, # Deterministic recovery
-    "axiom": 0.7,      # Swarm coordination overhead
-    "neuron": 0.5      # Self-recovery fastest
+    "human": 1.0,  # Baseline
+    "grok": 0.8,  # AI recovers faster
+    "agentproof": 0.6,  # Deterministic recovery
+    "axiom": 0.7,  # Swarm coordination overhead
+    "neuron": 0.5,  # Self-recovery fastest
 }
 
 # Universal Pruning Weights
 PROJECT_PRUNE_WEIGHT = {
-    "human": 1.0,      # Preserve human entries slightly more
-    "agentproof": 0.9, # Slightly more aggressive on AP
-    "axiom": 0.9,      # Slightly more aggressive on AXIOM
-    "grok": 0.85,      # Most aggressive on Grok (ephemeral by nature)
-    "neuron": 1.0      # Self-entries preserved
+    "human": 1.0,  # Preserve human entries slightly more
+    "agentproof": 0.9,  # Slightly more aggressive on AP
+    "axiom": 0.9,  # Slightly more aggressive on AXIOM
+    "grok": 0.85,  # Most aggressive on Grok (ephemeral by nature)
+    "neuron": 1.0,  # Self-entries preserved
 }
 
 # Entry constraints
@@ -101,24 +109,24 @@ TAU_RANGE = (1.0, 480.0)  # Valid range: 1 min to 8 hours
 
 # Task-specific τ presets
 TAU_PRESETS = {
-    "quick_task": 15.0,       # Short tasks, fast recovery expected
-    "standard": 120.0,        # Default, matches prior behavior
-    "deep_work": 240.0,       # Extended focus, slower recovery OK
-    "training_run": 480.0,    # Long runs, very slow recovery OK
+    "quick_task": 15.0,  # Short tasks, fast recovery expected
+    "standard": 120.0,  # Default, matches prior behavior
+    "deep_work": 240.0,  # Extended focus, slower recovery OK
+    "training_run": 480.0,  # Long runs, very slow recovery OK
 }
 
 # SLO Targets (from Grok validation)
-SLO_APPEND_OVERHEAD_MAX = 0.007          # <0.7% (achieved)
-SLO_APPEND_THROUGHPUT_MIN = 1500         # >1500/s (achieved)
-SLO_RECOVERY_RATE_MIN = 0.97             # >97% (achieved)
-SLO_PRUNING_COMPRESSION_MIN = 0.996      # >99.6% (achieved)
-SLO_CONTEXT_RESTORE_MAX_SECONDS = 45     # <45s (achieved)
+SLO_APPEND_OVERHEAD_MAX = 0.007  # <0.7% (achieved)
+SLO_APPEND_THROUGHPUT_MIN = 1500  # >1500/s (achieved)
+SLO_RECOVERY_RATE_MIN = 0.97  # >97% (achieved)
+SLO_PRUNING_COMPRESSION_MIN = 0.996  # >99.6% (achieved)
+SLO_CONTEXT_RESTORE_MAX_SECONDS = 45  # <45s (achieved)
 
 # Stress testing
 STRESS_TEST_DEFAULT_N = 10_000_000
 STRESS_TEST_CONCURRENT_WORKERS = 8
-STRESS_TEST_OVERHEAD_THRESHOLD = 0.01    # <1%
-STRESS_TEST_THROUGHPUT_FLOOR = 1000      # >1000/s
+STRESS_TEST_OVERHEAD_THRESHOLD = 0.01  # <1%
+STRESS_TEST_THROUGHPUT_FLOOR = 1000  # >1000/s
 
 # Fault injection
 FAILURE_TYPES = ["timeout", "disconnect", "corrupt", "slow"]
@@ -183,8 +191,18 @@ POWER_LAW_ALPHA = 0.5
 POWER_LAW_SCALE = 2.0
 
 # Energy estimation
-TECHNICAL_TERMS = ["federation", "merkle", "entropy", "kan", "spline",
-                   "receipt", "anchor", "proof", "hash", "topology"]
+TECHNICAL_TERMS = [
+    "federation",
+    "merkle",
+    "entropy",
+    "kan",
+    "spline",
+    "receipt",
+    "anchor",
+    "proof",
+    "hash",
+    "topology",
+]
 
 # ============================================
 # v4.4 ENTROPY PUMP CONSTANTS
@@ -192,34 +210,73 @@ TECHNICAL_TERMS = ["federation", "merkle", "entropy", "kan", "spline",
 ENTROPY_PUMP_MODE = True
 
 # Classification thresholds
-LOW_ALPHA_EXPORT_THRESHOLD = 0.4      # α < 0.4 → export candidate
+LOW_ALPHA_EXPORT_THRESHOLD = 0.4  # α < 0.4 → export candidate
 HIGH_ALPHA_RECIRCULATE_THRESHOLD = 0.7  # α ≥ 0.7 → recirculate
 
 # Amplification factors
-HIGH_ALPHA_AMPLIFICATION = 2.0         # Recirculated entries gain 2x weight
-LOW_ALPHA_DECAY = 0.5                  # Exported entries compressed 50%
+HIGH_ALPHA_AMPLIFICATION = 2.0  # Recirculated entries gain 2x weight
+LOW_ALPHA_DECAY = 0.5  # Exported entries compressed 50%
 
 # Export destinations
 EXPORT_DESTINATIONS = {
-    "stub": "external_audit_stub/",     # Local compressed stubs
-    "chain": "audit_chain_queue/",      # Queue for blockchain anchor
-    "archive": "cold_archive/",         # Deep cold storage
+    "stub": "external_audit_stub/",  # Local compressed stubs
+    "chain": "audit_chain_queue/",  # Queue for blockchain anchor
+    "archive": "cold_archive/",  # Deep cold storage
 }
 
 # Burst sync parameters
-BURST_SYNC_MIN_INTERVAL = 60.0         # Minimum seconds between bursts
-BURST_SYNC_MAX_BATCH = 1000            # Maximum entries per burst
-ISOLATION_LATENCY_ADVANTAGE = True     # Enable isolation mode
+BURST_SYNC_MIN_INTERVAL = 60.0  # Minimum seconds between bursts
+BURST_SYNC_MAX_BATCH = 1000  # Maximum entries per burst
+ISOLATION_LATENCY_ADVANTAGE = True  # Enable isolation mode
 
 # Entropy targets
-INTERNAL_ENTROPY_TARGET = 0.1          # Near-zero target
-INTERNAL_ENTROPY_CRITICAL = 0.5        # Trigger aggressive export
+INTERNAL_ENTROPY_TARGET = 0.1  # Near-zero target
+INTERNAL_ENTROPY_CRITICAL = 0.5  # Trigger aggressive export
 
 # Gap-triggered export
-GAP_EXPORT_MULTIPLIER = 3.0            # Export 3x more on gap detection
+GAP_EXPORT_MULTIPLIER = 3.0  # Export 3x more on gap detection
 
 # Latency thresholds for burst mode
-BURST_MODE_LATENCY_THRESHOLD = 10000   # ms - switch to burst mode above this
+BURST_MODE_LATENCY_THRESHOLD = 10000  # ms - switch to burst mode above this
+
+
+# ============================================
+# v4.5 RESONANCE CATALYST CONSTANTS
+# ============================================
+RESONANCE_MODE = True  # Enable oscillation (vs pump-only)
+OSCILLATION_AMPLITUDE_DEFAULT = 0.5  # Initial α swing target (0-1)
+OSCILLATION_AMPLITUDE_MAX = 1.5  # Divergence threshold → stoprule
+
+# Injection Parameters
+LOW_ALPHA_INJECTION_RANGE = (0.1, 0.3)  # α range for synthetic entries
+INJECTION_COUNT_DEFAULT = 5  # Entries per injection phase
+INJECTION_COUNT_MAX = 100  # Stoprule threshold
+
+# Surge Parameters
+HIGH_ALPHA_SURGE_THRESHOLD = 0.6  # Minimum α to receive surge
+SURGE_MULTIPLIER_DEFAULT = 1.5  # Salience amplification factor
+SURGE_ALPHA_CAP = 1.0  # Maximum α after surge
+
+# Frequency Sources
+FREQUENCY_SOURCES = [
+    "HUMAN_CIRCADIAN",  # 24h
+    "HUMAN_FOCUS",  # 90min
+    "GROK_TOKEN_REFRESH",  # Dynamic
+    "MARS_LIGHT_DELAY",  # 3-22min
+    "INTERSTELLAR_BURST",  # 4yr
+]
+DEFAULT_FREQUENCY = "HUMAN_FOCUS"
+
+# Gap Resonance
+GAP_AMPLITUDE_BOOST = 2.0  # Gap amplifies next oscillation by 2x
+
+# Phase Transition Detection
+TRANSITION_CORRELATION_THRESHOLD = 0.7  # Minimum correlation to count as transition
+
+# Oscillation State (module-level)
+_oscillation_phase = "inject"  # Current phase: "inject" or "surge"
+_oscillation_amplitude = OSCILLATION_AMPLITUDE_DEFAULT
+_oscillation_frequency = 0.001  # Hz
 
 
 # CLAUDEME §8 Core Exception
@@ -237,7 +294,11 @@ def dual_hash(data: bytes | str) -> str:
     if isinstance(data, str):
         data = data.encode("utf-8")
     sha256_hex = hashlib.sha256(data).hexdigest()
-    blake3_hex = blake3.blake3(data).hexdigest() if HAS_BLAKE3 else hashlib.sha256(b"blake3:" + data).hexdigest()
+    blake3_hex = (
+        blake3.blake3(data).hexdigest()
+        if HAS_BLAKE3
+        else hashlib.sha256(b"blake3:" + data).hexdigest()
+    )
     return f"{sha256_hex}:{blake3_hex}"
 
 
@@ -268,7 +329,7 @@ def merkle(items: list) -> str:
             hashes.append(hashes[-1])  # Duplicate last if odd
         new_hashes = []
         for i in range(0, len(hashes), 2):
-            combined = f"{hashes[i]}|{hashes[i+1]}"
+            combined = f"{hashes[i]}|{hashes[i + 1]}"
             new_hashes.append(dual_hash(combined))
         hashes = new_hashes
 
@@ -277,7 +338,10 @@ def merkle(items: list) -> str:
 
 # Receipt storage path - use function for lazy evaluation (test compatibility)
 def _get_receipts_path() -> Path:
-    return Path(os.environ.get("NEURON_RECEIPTS", Path.home() / "neuron" / "receipts.jsonl"))
+    return Path(
+        os.environ.get("NEURON_RECEIPTS", Path.home() / "neuron" / "receipts.jsonl")
+    )
+
 
 RECEIPTS_PATH = _get_receipts_path()
 
@@ -300,9 +364,11 @@ def emit_receipt(receipt_type: str, data: dict) -> dict:
     receipt = {
         "type": receipt_type,
         "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        **data
+        **data,
     }
-    receipt["hash"] = dual_hash(json.dumps({k: v for k, v in receipt.items() if k != "hash"}, sort_keys=True))
+    receipt["hash"] = dual_hash(
+        json.dumps({k: v for k, v in receipt.items() if k != "hash"}, sort_keys=True)
+    )
 
     try:
         receipts_path = _get_receipts_path()
@@ -310,7 +376,11 @@ def emit_receipt(receipt_type: str, data: dict) -> dict:
         with open(receipts_path, "a") as f:
             f.write(json.dumps(receipt) + "\n")
     except Exception as e:
-        raise StopRule("receipt_emission", f"Failed to emit receipt: {e}", {"receipt_type": receipt_type})
+        raise StopRule(
+            "receipt_emission",
+            f"Failed to emit receipt: {e}",
+            {"receipt_type": receipt_type},
+        )
 
     return receipt
 
@@ -319,7 +389,9 @@ def energy_estimate(task: str, next_action: str, token_count: int = 0) -> float:
     """Estimate cognitive load from text complexity and token count."""
     words = len(task.split()) + len(next_action.split())
     word_factor = 0.5 + (words / 20)
-    tech_count = sum(1 for t in TECHNICAL_TERMS if t in task.lower() or t in next_action.lower())
+    tech_count = sum(
+        1 for t in TECHNICAL_TERMS if t in task.lower() or t in next_action.lower()
+    )
     tech_factor = 1.0 + 0.1 * tech_count
     base_energy = word_factor * tech_factor
     if token_count > 0:
@@ -339,8 +411,11 @@ def salience_decay(entry: dict, current_ts: datetime | None = None) -> float:
     return base_salience * math.exp(-DECAY_RATE_PER_DAY * age_days / replay_boost)
 
 
-def recovery_cost(gap_minutes: float, tau: float = DEFAULT_RECOVERY_TAU,
-                  model: str = DEFAULT_RECOVERY_CURVE) -> float:
+def recovery_cost(
+    gap_minutes: float,
+    tau: float = DEFAULT_RECOVERY_TAU,
+    model: str = DEFAULT_RECOVERY_CURVE,
+) -> float:
     """Non-linear cost: pluggable recovery model (v4.2).
 
     Args:
@@ -359,7 +434,7 @@ def recovery_cost(gap_minutes: float, tau: float = DEFAULT_RECOVERY_TAU,
     elif model == "power_law":
         if gap_minutes <= 0:
             return 1.0
-        return 1.0 + POWER_LAW_SCALE * (gap_minutes ** POWER_LAW_ALPHA)
+        return 1.0 + POWER_LAW_SCALE * (gap_minutes**POWER_LAW_ALPHA)
     elif model == "linear":
         if gap_minutes <= 0:
             return 1.0
@@ -369,9 +444,20 @@ def recovery_cost(gap_minutes: float, tau: float = DEFAULT_RECOVERY_TAU,
         return 1.0 + RECOVERY_K * (1 - math.exp(-gap_minutes / tau))
 
 
-def append(project: str, task: str, next_action: str, commit: str | None = None, energy: float | None = None,
-           model: str = "neuron", token_count: int = 0, inference_id: str | None = None, context_summary: str = "",
-           event_type: str = "task", salience: float = 1.0, source_context: dict | None = None) -> dict:
+def append(
+    project: str,
+    task: str,
+    next_action: str,
+    commit: str | None = None,
+    energy: float | None = None,
+    model: str = "neuron",
+    token_count: int = 0,
+    inference_id: str | None = None,
+    context_summary: str = "",
+    event_type: str = "task",
+    salience: float = 1.0,
+    source_context: dict | None = None,
+) -> dict:
     """Append entry to shared ledger with salience/energy and optional inference metadata.
 
     v4.3 Extended: Supports multi-project append with event_type and source_context.
@@ -394,7 +480,11 @@ def append(project: str, task: str, next_action: str, commit: str | None = None,
         Complete entry dict with hash
     """
     if project not in ALLOWED_PROJECTS:
-        raise StopRule("invalid_project", f"Project must be one of: {ALLOWED_PROJECTS}", {"project": project})
+        raise StopRule(
+            "invalid_project",
+            f"Project must be one of: {ALLOWED_PROJECTS}",
+            {"project": project},
+        )
     if model not in SUPPORTED_MODELS:
         raise ValueError(f"Model must be one of: {SUPPORTED_MODELS}")
 
@@ -419,9 +509,11 @@ def append(project: str, task: str, next_action: str, commit: str | None = None,
         "token_count": token_count,
         "inference_id": inference_id,
         "context_summary": context_summary,
-        "source_context": source_context or {}  # v4.3 NEW
+        "source_context": source_context or {},  # v4.3 NEW
     }
-    entry["hash"] = dual_hash(json.dumps({k: v for k, v in entry.items() if k != "hash"}, sort_keys=True))
+    entry["hash"] = dual_hash(
+        json.dumps({k: v for k, v in entry.items() if k != "hash"}, sort_keys=True)
+    )
     ledger_path = _get_ledger_path()
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     with open(ledger_path, "a") as f:
@@ -431,14 +523,17 @@ def append(project: str, task: str, next_action: str, commit: str | None = None,
     if LEDGER_SHARED_MODE:
         ledger = _read_ledger()
         projects_active = list(set(e.get("project", "neuron") for e in ledger))
-        emit_receipt("shared_ledger_append", {
-            "tenant_id": "neuron",
-            "entry_id": entry.get("hash", "")[:32],
-            "project": project,
-            "event_type": event_type,
-            "ledger_size": len(ledger),
-            "projects_active": projects_active
-        })
+        emit_receipt(
+            "shared_ledger_append",
+            {
+                "tenant_id": "neuron",
+                "entry_id": entry.get("hash", "")[:32],
+                "project": project,
+                "event_type": event_type,
+                "ledger_size": len(ledger),
+                "projects_active": projects_active,
+            },
+        )
 
     return entry
 
@@ -466,7 +561,7 @@ def append_from_agentproof(event: str, context: dict) -> dict:
         next_action="verify_chain_state",
         event_type=event_type,
         salience=0.7,
-        source_context={**context, "trigger": "auto"}
+        source_context={**context, "trigger": "auto"},
     )
 
 
@@ -494,7 +589,7 @@ def append_from_axiom(event: str, context: dict) -> dict:
         next_action="integrate_law",
         event_type=event_type,
         salience=0.8,
-        source_context={**context, "trigger": "auto"}
+        source_context={**context, "trigger": "auto"},
     )
 
 
@@ -522,7 +617,7 @@ def append_from_grok(event: str, context: dict) -> dict:
         next_action="restore_context",
         event_type=event_type,
         salience=0.6,
-        source_context={**context, "trigger": "auto"}
+        source_context={**context, "trigger": "auto"},
     )
 
 
@@ -531,17 +626,28 @@ def load_ledger() -> list:
     return _read_ledger()
 
 
-def inference_append(model: str, task: str, next_action: str, context_summary: str,
-                     token_count: int, inference_id: str | None = None) -> dict:
+def inference_append(
+    model: str,
+    task: str,
+    next_action: str,
+    context_summary: str,
+    token_count: int,
+    inference_id: str | None = None,
+) -> dict:
     """Auto-append from LLM inference cycles with full context metadata."""
     if model not in SUPPORTED_MODELS:
         raise ValueError(f"Model must be one of: {SUPPORTED_MODELS}")
     if inference_id is None:
         inference_id = f"inf_{uuid.uuid4().hex[:12]}"
     return append(
-        project="neuron", task=task, next_action=next_action, commit=None,
-        model=model, token_count=token_count, inference_id=inference_id,
-        context_summary=context_summary[:MAX_CONTEXT_SUMMARY_LEN]
+        project="neuron",
+        task=task,
+        next_action=next_action,
+        commit=None,
+        model=model,
+        token_count=token_count,
+        inference_id=inference_id,
+        context_summary=context_summary[:MAX_CONTEXT_SUMMARY_LEN],
     )
 
 
@@ -576,7 +682,10 @@ def replay_to_context(n: int = 10, format: str = "context") -> str:
     if not entries:
         return "## NEURON State Recovery\n\nNo entries available."
 
-    lines = ["## NEURON State Recovery", f"\n### Recent Context ({len(entries)} entries)\n"]
+    lines = [
+        "## NEURON State Recovery",
+        f"\n### Recent Context ({len(entries)} entries)\n",
+    ]
     for e in entries:
         model = e.get("model", "neuron")
         ts = e.get("ts", "unknown")
@@ -597,7 +706,12 @@ def replay_to_context(n: int = 10, format: str = "context") -> str:
     return "\n".join(lines)
 
 
-def replay(n: int | None = 10, since: str | None = None, increment_replay: bool = False, format: str = "list") -> list[dict] | str:
+def replay(
+    n: int | None = 10,
+    since: str | None = None,
+    increment_replay: bool = False,
+    format: str = "list",
+) -> list[dict] | str:
     """Get entries, optionally increment replay_count (simulates neural reactivation)."""
     entries = _read_ledger()
     if since:
@@ -610,7 +724,11 @@ def replay(n: int | None = 10, since: str | None = None, increment_replay: bool 
             if e.get("hash") in result_hashes:
                 e["replay_count"] = e.get("replay_count", 0) + 1
         _write_ledger(all_entries)
-        result = [e for e in all_entries if e.get("hash") in result_hashes][-n:] if n else [e for e in all_entries if e.get("hash") in result_hashes]
+        result = (
+            [e for e in all_entries if e.get("hash") in result_hashes][-n:]
+            if n
+            else [e for e in all_entries if e.get("hash") in result_hashes]
+        )
 
     if format == "context":
         return replay_to_context(n=n)
@@ -633,7 +751,9 @@ def sync_ledger(remote_path: str) -> dict:
                         continue
 
     local_by_hash = {e.get("hash"): e for e in local_entries}
-    local_by_inf_id = {e.get("inference_id"): e for e in local_entries if e.get("inference_id")}
+    local_by_inf_id = {
+        e.get("inference_id"): e for e in local_entries if e.get("inference_id")
+    }
 
     conflicts_resolved = 0
     for re in remote_entries:
@@ -665,12 +785,15 @@ def sync_ledger(remote_path: str) -> dict:
         "merged_entries": len(merged),
         "conflicts_resolved": conflicts_resolved,
         "resolution_strategy": SYNC_CONFLICT_RESOLUTION,
-        "sync_ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        "sync_ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
 
-def alpha(threshold_minutes: int = DEFAULT_GAP_THRESHOLD_MIN, tau: float = DEFAULT_RECOVERY_TAU,
-          curve_model: str = DEFAULT_RECOVERY_CURVE) -> dict:
+def alpha(
+    threshold_minutes: int = DEFAULT_GAP_THRESHOLD_MIN,
+    tau: float = DEFAULT_RECOVERY_TAU,
+    curve_model: str = DEFAULT_RECOVERY_CURVE,
+) -> dict:
     """Calculate α with variance, expert_novice_ratio, configurable τ, and recovery curve model.
 
     Args:
@@ -685,13 +808,23 @@ def alpha(threshold_minutes: int = DEFAULT_GAP_THRESHOLD_MIN, tau: float = DEFAU
     tau = max(TAU_RANGE[0], min(TAU_RANGE[1], tau))  # Clamp to valid range
     entries = _read_ledger()
     if len(entries) < 2:
-        return {"total_entries": len(entries), "gaps_detected": 0, "gaps": [], "alpha_mean": 0.0,
-                "alpha_min": 0.0, "alpha_max": 0.0, "alpha_variance": 0.0, "alpha_std": 0.0,
-                "expert_novice_ratio": 1.0, "tau_used": tau, "curve_model": curve_model}
+        return {
+            "total_entries": len(entries),
+            "gaps_detected": 0,
+            "gaps": [],
+            "alpha_mean": 0.0,
+            "alpha_min": 0.0,
+            "alpha_max": 0.0,
+            "alpha_variance": 0.0,
+            "alpha_std": 0.0,
+            "expert_novice_ratio": 1.0,
+            "tau_used": tau,
+            "curve_model": curve_model,
+        }
     entries.sort(key=lambda e: e.get("ts", ""))
     gaps, threshold_seconds = [], threshold_minutes * 60
     for i in range(1, len(entries)):
-        prev_ts = datetime.fromisoformat(entries[i-1]["ts"].replace("Z", "+00:00"))
+        prev_ts = datetime.fromisoformat(entries[i - 1]["ts"].replace("Z", "+00:00"))
         curr_ts = datetime.fromisoformat(entries[i]["ts"].replace("Z", "+00:00"))
         gap_seconds = (curr_ts - prev_ts).total_seconds()
         if gap_seconds > threshold_seconds:
@@ -700,26 +833,54 @@ def alpha(threshold_minutes: int = DEFAULT_GAP_THRESHOLD_MIN, tau: float = DEFAU
             tau_factor = tau / DEFAULT_RECOVERY_TAU
             recovery_min = max(1.0, (gap_seconds / 60 / 10) * tau_factor)
             gap_recovery_cost = recovery_cost(gap_minutes, tau, model=curve_model)
-            gaps.append({"start": entries[i-1]["ts"], "end": entries[i]["ts"], "duration_min": round(gap_minutes, 1),
-                         "recovery_min": round(recovery_min, 1), "alpha": round(gap_minutes / recovery_min, 1),
-                         "recovery_cost": round(gap_recovery_cost, 2)})
+            gaps.append(
+                {
+                    "start": entries[i - 1]["ts"],
+                    "end": entries[i]["ts"],
+                    "duration_min": round(gap_minutes, 1),
+                    "recovery_min": round(recovery_min, 1),
+                    "alpha": round(gap_minutes / recovery_min, 1),
+                    "recovery_cost": round(gap_recovery_cost, 2),
+                }
+            )
     alpha_values = [g["alpha"] for g in gaps]
     if not alpha_values:
-        return {"total_entries": len(entries), "gaps_detected": 0, "gaps": [], "alpha_mean": 0.0,
-                "alpha_min": 0.0, "alpha_max": 0.0, "alpha_variance": 0.0, "alpha_std": 0.0,
-                "expert_novice_ratio": 1.0, "tau_used": tau, "curve_model": curve_model}
+        return {
+            "total_entries": len(entries),
+            "gaps_detected": 0,
+            "gaps": [],
+            "alpha_mean": 0.0,
+            "alpha_min": 0.0,
+            "alpha_max": 0.0,
+            "alpha_variance": 0.0,
+            "alpha_std": 0.0,
+            "expert_novice_ratio": 1.0,
+            "tau_used": tau,
+            "curve_model": curve_model,
+        }
     mean_a = sum(alpha_values) / len(alpha_values)
     variance = sum((a - mean_a) ** 2 for a in alpha_values) / len(alpha_values)
-    return {"total_entries": len(entries), "gaps_detected": len(gaps), "gaps": gaps,
-            "alpha_mean": round(mean_a, 1), "alpha_min": round(min(alpha_values), 1), "alpha_max": round(max(alpha_values), 1),
-            "alpha_variance": round(variance, 2), "alpha_std": round(math.sqrt(variance), 2),
-            "expert_novice_ratio": round(max(alpha_values) / min(alpha_values), 1) if min(alpha_values) > 0 else float('inf'),
-            "tau_used": tau, "curve_model": curve_model}
+    return {
+        "total_entries": len(entries),
+        "gaps_detected": len(gaps),
+        "gaps": gaps,
+        "alpha_mean": round(mean_a, 1),
+        "alpha_min": round(min(alpha_values), 1),
+        "alpha_max": round(max(alpha_values), 1),
+        "alpha_variance": round(variance, 2),
+        "alpha_std": round(math.sqrt(variance), 2),
+        "expert_novice_ratio": round(max(alpha_values) / min(alpha_values), 1)
+        if min(alpha_values) > 0
+        else float("inf"),
+        "tau_used": tau,
+        "curve_model": curve_model,
+    }
 
 
 # ============================================
 # v4.3 SYSTEM-WIDE ALPHA (Gate 2)
 # ============================================
+
 
 def detect_system_gaps(ledger: list | None = None, threshold_minutes: int = 1) -> list:
     """Identify gaps between ANY consecutive entries regardless of project.
@@ -753,13 +914,15 @@ def detect_system_gaps(ledger: list | None = None, threshold_minutes: int = 1) -
         gap_seconds = (curr_ts - prev_ts).total_seconds()
 
         if gap_seconds > threshold_seconds:
-            gaps.append({
-                "start": prev_entry["ts"],
-                "end": curr_entry["ts"],
-                "gap_minutes": round(gap_seconds / 60, 2),
-                "from_project": prev_entry.get("project", "neuron"),
-                "to_project": curr_entry.get("project", "neuron")
-            })
+            gaps.append(
+                {
+                    "start": prev_entry["ts"],
+                    "end": curr_entry["ts"],
+                    "gap_minutes": round(gap_seconds / 60, 2),
+                    "from_project": prev_entry.get("project", "neuron"),
+                    "to_project": curr_entry.get("project", "neuron"),
+                }
+            )
 
     return gaps
 
@@ -782,8 +945,11 @@ def weighted_gap(gap_minutes: float, from_project: str, to_project: str) -> floa
     return gap_minutes * from_weight * to_weight
 
 
-def alpha_system_wide(ledger: list | None = None, tau: float = SYSTEM_TAU_DEFAULT,
-                      threshold_minutes: int = 1) -> float:
+def alpha_system_wide(
+    ledger: list | None = None,
+    tau: float = SYSTEM_TAU_DEFAULT,
+    threshold_minutes: int = 1,
+) -> float:
     """Calculate α across ALL gaps weighted by project.
 
     v4.3: "α is calculated across human + AI recovery time."
@@ -810,7 +976,9 @@ def alpha_system_wide(ledger: list | None = None, tau: float = SYSTEM_TAU_DEFAUL
     return sum(weighted_values) / len(weighted_values)
 
 
-def alpha_by_project(ledger: list | None = None, tau: float = SYSTEM_TAU_DEFAULT) -> dict:
+def alpha_by_project(
+    ledger: list | None = None, tau: float = SYSTEM_TAU_DEFAULT
+) -> dict:
     """Returns per-project α breakdown.
 
     v4.3: Useful for debugging and understanding project-specific recovery patterns.
@@ -844,20 +1012,28 @@ def alpha_by_project(ledger: list | None = None, tau: float = SYSTEM_TAU_DEFAULT
         gap_values = []
 
         for i in range(1, len(sorted_entries)):
-            prev_ts = datetime.fromisoformat(sorted_entries[i-1]["ts"].replace("Z", "+00:00"))
-            curr_ts = datetime.fromisoformat(sorted_entries[i]["ts"].replace("Z", "+00:00"))
+            prev_ts = datetime.fromisoformat(
+                sorted_entries[i - 1]["ts"].replace("Z", "+00:00")
+            )
+            curr_ts = datetime.fromisoformat(
+                sorted_entries[i]["ts"].replace("Z", "+00:00")
+            )
             gap_minutes = (curr_ts - prev_ts).total_seconds() / 60
 
             if gap_minutes > 1:
                 weight = SYSTEM_GAP_WEIGHT.get(proj, 1.0)
                 gap_values.append(gap_minutes * weight / tau)
 
-        result[proj] = round(sum(gap_values) / len(gap_values), 2) if gap_values else 0.0
+        result[proj] = (
+            round(sum(gap_values) / len(gap_values), 2) if gap_values else 0.0
+        )
 
     return result
 
 
-def emit_system_alpha_receipt(ledger: list | None = None, tau: float = SYSTEM_TAU_DEFAULT) -> dict:
+def emit_system_alpha_receipt(
+    ledger: list | None = None, tau: float = SYSTEM_TAU_DEFAULT
+) -> dict:
     """Emit system_alpha_receipt with full metrics.
 
     v4.3: Comprehensive alpha analysis for the triad.
@@ -875,23 +1051,31 @@ def emit_system_alpha_receipt(ledger: list | None = None, tau: float = SYSTEM_TA
 
     mean_gap = sum(g["gap_minutes"] for g in gaps) / len(gaps) if gaps else 0.0
 
-    return emit_receipt("system_alpha", {
-        "tenant_id": "neuron",
-        "alpha_system": round(alpha_system, 2),
-        "alpha_by_project": by_project,
-        "total_gaps": len(gaps),
-        "cross_project_gaps": len(cross_project_gaps),
-        "mean_gap_minutes": round(mean_gap, 2),
-        "tau": tau
-    })
+    return emit_receipt(
+        "system_alpha",
+        {
+            "tenant_id": "neuron",
+            "alpha_system": round(alpha_system, 2),
+            "alpha_by_project": by_project,
+            "total_gaps": len(gaps),
+            "cross_project_gaps": len(cross_project_gaps),
+            "mean_gap_minutes": round(mean_gap, 2),
+            "tau": tau,
+        },
+    )
 
 
 # ============================================
 # v4.3 UNIVERSAL PRUNING (Gate 4)
 # ============================================
 
-def universal_score(entry: dict, system_alpha: float, now: datetime | None = None,
-                    tau: float = SYSTEM_TAU_DEFAULT) -> float:
+
+def universal_score(
+    entry: dict,
+    system_alpha: float,
+    now: datetime | None = None,
+    tau: float = SYSTEM_TAU_DEFAULT,
+) -> float:
     """Calculate universal score for pruning.
 
     v4.3: score = salience × exp(-age/τ) × project_weight × (1 / max(system_alpha, 0.1))
@@ -917,7 +1101,9 @@ def universal_score(entry: dict, system_alpha: float, now: datetime | None = Non
     project_weight = PROJECT_PRUNE_WEIGHT.get(project, 1.0)
 
     # Age decay
-    age_factor = math.exp(-age_minutes / (tau * 60))  # tau is in minutes, convert to match age
+    age_factor = math.exp(
+        -age_minutes / (tau * 60)
+    )  # tau is in minutes, convert to match age
 
     # Alpha factor: higher system alpha = more aggressive pruning
     alpha_factor = 1.0 / max(system_alpha, 0.1)
@@ -928,30 +1114,51 @@ def universal_score(entry: dict, system_alpha: float, now: datetime | None = Non
     return salience * age_factor * project_weight * alpha_factor * replay_boost
 
 
-def consolidate(top_k: int = DEFAULT_CONSOLIDATE_TOP_K, alpha_threshold: float = DEFAULT_ALPHA_THRESHOLD) -> dict:
+def consolidate(
+    top_k: int = DEFAULT_CONSOLIDATE_TOP_K,
+    alpha_threshold: float = DEFAULT_ALPHA_THRESHOLD,
+) -> dict:
     """Hippocampal replay: strengthen high-α entries with token_count weighting (Wilson & McNaughton 1994)."""
     entries = _read_ledger()
     stats = alpha(threshold_minutes=1)
-    qualifying = [(g, g["alpha"]) for g in stats["gaps"] if g["alpha"] > alpha_threshold]
+    qualifying = [
+        (g, g["alpha"]) for g in stats["gaps"] if g["alpha"] > alpha_threshold
+    ]
     qualifying.sort(key=lambda x: x[1], reverse=True)
     affected_hashes, boost = [], 0.0
     for gap, a in qualifying[:top_k]:
         for e in entries:
             if e.get("ts") == gap["end"]:
                 old_sal = e.get("salience", 1.0)
-                token_weight = 1 + e.get("token_count", 0) / INFERENCE_CONTEXT_MAX_TOKENS
-                e["salience"] = min(1.0, old_sal + SALIENCE_BOOST_BASE * math.log(max(1, a)) * token_weight)
+                token_weight = (
+                    1 + e.get("token_count", 0) / INFERENCE_CONTEXT_MAX_TOKENS
+                )
+                e["salience"] = min(
+                    1.0,
+                    old_sal + SALIENCE_BOOST_BASE * math.log(max(1, a)) * token_weight,
+                )
                 boost += e["salience"] - old_sal
                 if a > HIGH_ALPHA_THRESHOLD:
-                    e["replay_count"] = e.get("replay_count", 0) + REPLAY_STRENGTH_FACTOR
+                    e["replay_count"] = (
+                        e.get("replay_count", 0) + REPLAY_STRENGTH_FACTOR
+                    )
                 affected_hashes.append(e.get("hash", "")[:16])
     _write_ledger(entries)
-    return {"consolidated_count": len(affected_hashes), "salience_boost": round(boost, 3), "entries_affected": affected_hashes}
+    return {
+        "consolidated_count": len(affected_hashes),
+        "salience_boost": round(boost, 3),
+        "entries_affected": affected_hashes,
+    }
 
 
-def prune(max_age_days: int = DEFAULT_MAX_AGE_DAYS, salience_threshold: float = DEFAULT_SALIENCE_THRESHOLD,
-          max_entries: int | None = None, universal: bool = True, alpha_weight: bool = True,
-          tau: float = SYSTEM_TAU_DEFAULT) -> dict:
+def prune(
+    max_age_days: int = DEFAULT_MAX_AGE_DAYS,
+    salience_threshold: float = DEFAULT_SALIENCE_THRESHOLD,
+    max_entries: int | None = None,
+    universal: bool = True,
+    alpha_weight: bool = True,
+    tau: float = SYSTEM_TAU_DEFAULT,
+) -> dict:
     """Synaptic downscaling with v4.3 universal pruning support.
 
     v4.3 Enhanced: Universal pruning across all projects using universal_score.
@@ -971,12 +1178,20 @@ def prune(max_age_days: int = DEFAULT_MAX_AGE_DAYS, salience_threshold: float = 
     entries = _read_ledger()
     archive_path = _get_archive_path()
     if not entries:
-        return {"pruned_count": 0, "archived_to": str(archive_path), "ledger_size_before": 0,
-                "ledger_size_after": 0, "compression_ratio": 0.0, "pruned_by_project": {},
-                "strategy": "universal" if universal else "legacy"}
+        return {
+            "pruned_count": 0,
+            "archived_to": str(archive_path),
+            "ledger_size_before": 0,
+            "ledger_size_after": 0,
+            "compression_ratio": 0.0,
+            "pruned_by_project": {},
+            "strategy": "universal" if universal else "legacy",
+        }
 
     now = datetime.now(timezone.utc)
-    system_alpha = alpha_system_wide(entries, tau) if (universal and alpha_weight) else 1.0
+    system_alpha = (
+        alpha_system_wide(entries, tau) if (universal and alpha_weight) else 1.0
+    )
 
     # Calculate scores for all entries
     scored_entries = []
@@ -1007,9 +1222,9 @@ def prune(max_age_days: int = DEFAULT_MAX_AGE_DAYS, salience_threshold: float = 
 
         # Preserve conditions (same as before)
         preserve = (
-            age_days < MIN_AGE_TO_PRUNE_DAYS or
-            e.get("replay_count", 0) >= MIN_REPLAY_TO_PRESERVE or
-            score >= SALIENCE_RETENTION_THRESHOLD
+            age_days < MIN_AGE_TO_PRUNE_DAYS
+            or e.get("replay_count", 0) >= MIN_REPLAY_TO_PRESERVE
+            or score >= SALIENCE_RETENTION_THRESHOLD
         )
 
         # Check if we should keep based on max_entries
@@ -1027,8 +1242,15 @@ def prune(max_age_days: int = DEFAULT_MAX_AGE_DAYS, salience_threshold: float = 
     # Final enforcement of max_entries if still over
     if max_entries and len(keep) > max_entries:
         # Re-sort keep by score and trim
-        keep_scored = [(e, universal_score(e, system_alpha, now, tau) if universal else salience_decay(e, now))
-                       for e in keep]
+        keep_scored = [
+            (
+                e,
+                universal_score(e, system_alpha, now, tau)
+                if universal
+                else salience_decay(e, now),
+            )
+            for e in keep
+        ]
         keep_scored.sort(key=lambda x: x[1], reverse=True)  # Highest scores first
         final_keep = [e for e, _ in keep_scored[:max_entries]]
         overflow = [e for e, _ in keep_scored[max_entries:]]
@@ -1053,30 +1275,35 @@ def prune(max_age_days: int = DEFAULT_MAX_AGE_DAYS, salience_threshold: float = 
         "ledger_size_before": len(entries),
         "ledger_size_after": len(keep),
         "compression_ratio": round(compression_ratio, 4),
-        "salience_preserved": sum(1 for e in keep if salience_decay(e, now) >= SALIENCE_RETENTION_THRESHOLD),
+        "salience_preserved": sum(
+            1 for e in keep if salience_decay(e, now) >= SALIENCE_RETENTION_THRESHOLD
+        ),
         "pruned_by_project": pruned_by_project,
         "system_alpha": round(system_alpha, 2),
-        "strategy": "universal" if universal else "legacy"
+        "strategy": "universal" if universal else "legacy",
     }
 
     # Emit universal_prune_receipt for v4.3
     if universal and PRUNING_UNIVERSAL_SALIENCE:
-        emit_receipt("universal_prune", {
-            "tenant_id": "neuron",
-            "before_count": len(entries),
-            "after_count": len(keep),
-            "pruned_by_project": pruned_by_project,
-            "system_alpha": round(system_alpha, 2),
-            "compression_ratio": round(compression_ratio, 4),
-            "strategy": "universal"
-        })
+        emit_receipt(
+            "universal_prune",
+            {
+                "tenant_id": "neuron",
+                "before_count": len(entries),
+                "after_count": len(keep),
+                "pruned_by_project": pruned_by_project,
+                "system_alpha": round(system_alpha, 2),
+                "compression_ratio": round(compression_ratio, 4),
+                "strategy": "universal",
+            },
+        )
 
     return result
 
 
 def predict_next(n_context: int = 5) -> str | None:
     """Prospective memory: predict next action from history patterns."""
-    entries = _read_ledger()[-n_context * 3:]
+    entries = _read_ledger()[-n_context * 3 :]
     if len(entries) < 2:
         return None
     patterns = Counter()
@@ -1084,7 +1311,11 @@ def predict_next(n_context: int = 5) -> str | None:
         patterns[e.get("next", "")] += 1
     current_task = entries[-1].get("task", "").lower() if entries else ""
     for e in entries[:-1]:
-        if any(word in e.get("task", "").lower() for word in current_task.split() if len(word) > 3):
+        if any(
+            word in e.get("task", "").lower()
+            for word in current_task.split()
+            if len(word) > 3
+        ):
             return e.get("next")
     return patterns.most_common(1)[0][0] if patterns else None
 
@@ -1092,6 +1323,7 @@ def predict_next(n_context: int = 5) -> str | None:
 # ============================================
 # v4.4 ENTROPY PUMP PATH HELPERS
 # ============================================
+
 
 def _get_stub_path() -> Path:
     """Get path for external audit stubs."""
@@ -1121,7 +1353,10 @@ def _get_burst_queue_path() -> Path:
 # v4.4 GATE 1: PUMP CLASSIFICATION
 # ============================================
 
-def grok_aligned_score(entry: dict, now: datetime | None = None, tau: float = SYSTEM_TAU_DEFAULT) -> float:
+
+def grok_aligned_score(
+    entry: dict, now: datetime | None = None, tau: float = SYSTEM_TAU_DEFAULT
+) -> float:
     """Calculate entry-level α (Grok-aligned score) for pump classification.
 
     Higher α = more valuable (keep/recirculate)
@@ -1152,7 +1387,9 @@ def grok_aligned_score(entry: dict, now: datetime | None = None, tau: float = SY
     salience = entry.get("salience", 1.0)
 
     # Age decay factor (exponential decay)
-    age_factor = math.exp(-age_minutes / (tau * 60))  # Convert tau to match age in minutes
+    age_factor = math.exp(
+        -age_minutes / (tau * 60)
+    )  # Convert tau to match age in minutes
 
     # Replay boost (more replays = more valuable)
     replay_count = entry.get("replay_count", 0)
@@ -1168,8 +1405,9 @@ def grok_aligned_score(entry: dict, now: datetime | None = None, tau: float = SY
     return alpha
 
 
-def compute_internal_entropy(ledger: list, now: datetime | None = None,
-                             tau: float = SYSTEM_TAU_DEFAULT) -> float:
+def compute_internal_entropy(
+    ledger: list, now: datetime | None = None, tau: float = SYSTEM_TAU_DEFAULT
+) -> float:
     """Compute normalized internal entropy of the ledger.
 
     H = Σ (1 - α_i) / n
@@ -1194,13 +1432,14 @@ def compute_internal_entropy(ledger: list, now: datetime | None = None,
     disorder_sum = 0.0
     for entry in ledger:
         alpha = grok_aligned_score(entry, now, tau)
-        disorder_sum += (1.0 - alpha)
+        disorder_sum += 1.0 - alpha
 
     return disorder_sum / len(ledger)
 
 
-def classify_for_pump(ledger: list, tau: float = SYSTEM_TAU_DEFAULT,
-                      now: datetime | None = None) -> dict:
+def classify_for_pump(
+    ledger: list, tau: float = SYSTEM_TAU_DEFAULT, now: datetime | None = None
+) -> dict:
     """Classify all entries by α into export/retain/recirculate buckets.
 
     v4.4: "The ledger is not memory—it is an active entropy pump."
@@ -1239,16 +1478,19 @@ def classify_for_pump(ledger: list, tau: float = SYSTEM_TAU_DEFAULT,
     internal_entropy = compute_internal_entropy(ledger, now, tau)
 
     # Emit pump_classification_receipt
-    receipt = emit_receipt("pump_classification", {
-        "tenant_id": "neuron",
-        "total_entries": len(ledger),
-        "export_count": len(export),
-        "retain_count": len(retain),
-        "recirculate_count": len(recirculate),
-        "internal_entropy_before": round(internal_entropy, 4),
-        "classification_threshold_low": LOW_ALPHA_EXPORT_THRESHOLD,
-        "classification_threshold_high": HIGH_ALPHA_RECIRCULATE_THRESHOLD
-    })
+    receipt = emit_receipt(
+        "pump_classification",
+        {
+            "tenant_id": "neuron",
+            "total_entries": len(ledger),
+            "export_count": len(export),
+            "retain_count": len(retain),
+            "recirculate_count": len(recirculate),
+            "internal_entropy_before": round(internal_entropy, 4),
+            "classification_threshold_low": LOW_ALPHA_EXPORT_THRESHOLD,
+            "classification_threshold_high": HIGH_ALPHA_RECIRCULATE_THRESHOLD,
+        },
+    )
 
     return {
         "export": export,
@@ -1256,13 +1498,14 @@ def classify_for_pump(ledger: list, tau: float = SYSTEM_TAU_DEFAULT,
         "recirculate": recirculate,
         "internal_entropy": internal_entropy,
         "total_entries": len(ledger),
-        "receipt": receipt
+        "receipt": receipt,
     }
 
 
 # ============================================
 # v4.4 GATE 2: LOW-α EXPORT
 # ============================================
+
 
 def compress_to_stub(entry: dict) -> dict:
     """Reduce entry to minimal stub for storage.
@@ -1276,19 +1519,21 @@ def compress_to_stub(entry: dict) -> dict:
     Returns:
         Compressed stub dict
     """
-    payload = json.dumps({k: v for k, v in entry.items()
-                          if k not in ("_alpha", "hash")}, sort_keys=True)
+    payload = json.dumps(
+        {k: v for k, v in entry.items() if k not in ("_alpha", "hash")}, sort_keys=True
+    )
     return {
         "id": entry.get("hash", entry.get("inference_id", "unknown"))[:32],
         "ts": entry.get("ts"),
         "project": entry.get("project", "neuron"),
         "payload_hash": dual_hash(payload),
-        "original_alpha": entry.get("_alpha", 0.0)
+        "original_alpha": entry.get("_alpha", 0.0),
     }
 
 
-def export_low_alpha(entries: list, destination: str = "stub",
-                     compress: bool = True) -> dict:
+def export_low_alpha(
+    entries: list, destination: str = "stub", compress: bool = True
+) -> dict:
     """Export low-α entries to external destination.
 
     v4.4: "aggressively pumps low-α entropy outward"
@@ -1308,14 +1553,14 @@ def export_low_alpha(entries: list, destination: str = "stub",
             "compression_ratio": 0.0,
             "bytes_before": 0,
             "bytes_after": 0,
-            "internal_entropy_after": 0.0
+            "internal_entropy_after": 0.0,
         }
 
     # Determine destination path
     dest_paths = {
         "stub": _get_stub_path(),
         "chain": _get_chain_queue_path(),
-        "archive": _get_cold_archive_path()
+        "archive": _get_cold_archive_path(),
     }
     dest_path = dest_paths.get(destination, _get_stub_path())
     dest_path.mkdir(parents=True, exist_ok=True)
@@ -1327,7 +1572,9 @@ def export_low_alpha(entries: list, destination: str = "stub",
     if compress:
         output_entries = [compress_to_stub(e) for e in entries]
     else:
-        output_entries = [{k: v for k, v in e.items() if k != "_alpha"} for e in entries]
+        output_entries = [
+            {k: v for k, v in e.items() if k != "_alpha"} for e in entries
+        ]
 
     bytes_after = sum(len(json.dumps(e)) for e in output_entries)
 
@@ -1354,15 +1601,18 @@ def export_low_alpha(entries: list, destination: str = "stub",
     compression_ratio = 1.0 - (bytes_after / bytes_before) if bytes_before > 0 else 0.0
 
     # Emit receipt
-    receipt = emit_receipt("low_alpha_export", {
-        "tenant_id": "neuron",
-        "entries_exported": len(entries),
-        "destination": destination,
-        "compression_ratio": round(compression_ratio, 4),
-        "bytes_before": bytes_before,
-        "bytes_after": bytes_after,
-        "internal_entropy_after": round(internal_entropy_after, 4)
-    })
+    receipt = emit_receipt(
+        "low_alpha_export",
+        {
+            "tenant_id": "neuron",
+            "entries_exported": len(entries),
+            "destination": destination,
+            "compression_ratio": round(compression_ratio, 4),
+            "bytes_before": bytes_before,
+            "bytes_after": bytes_after,
+            "internal_entropy_after": round(internal_entropy_after, 4),
+        },
+    )
 
     return {
         "entries_exported": len(entries),
@@ -1372,7 +1622,7 @@ def export_low_alpha(entries: list, destination: str = "stub",
         "bytes_after": bytes_after,
         "internal_entropy_after": internal_entropy_after,
         "output_file": str(output_file),
-        "receipt": receipt
+        "receipt": receipt,
     }
 
 
@@ -1392,6 +1642,7 @@ def queue_for_anchor(entries: list) -> dict:
 # v4.4 GATE 3: HIGH-α RECIRCULATION
 # ============================================
 
+
 def amplify_entry(entry: dict, factor: float = HIGH_ALPHA_AMPLIFICATION) -> dict:
     """Amplify a high-α entry's salience.
 
@@ -1406,15 +1657,18 @@ def amplify_entry(entry: dict, factor: float = HIGH_ALPHA_AMPLIFICATION) -> dict
     old_salience = amplified.get("salience", 1.0)
     amplified["salience"] = min(1.0, old_salience * factor)
     amplified["replay_count"] = amplified.get("replay_count", 0) + 1
-    amplified["amplified_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    amplified["amplified_at"] = datetime.now(timezone.utc).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
     amplified["recirculation_round"] = amplified.get("recirculation_round", 0) + 1
     # Remove internal _alpha field if present
     amplified.pop("_alpha", None)
     return amplified
 
 
-def recirculate_high_alpha(entries: list,
-                           amplification: float = HIGH_ALPHA_AMPLIFICATION) -> dict:
+def recirculate_high_alpha(
+    entries: list, amplification: float = HIGH_ALPHA_AMPLIFICATION
+) -> dict:
     """Recirculate high-α entries with amplification.
 
     v4.4: "recirculating high-α patterns"
@@ -1432,7 +1686,7 @@ def recirculate_high_alpha(entries: list,
             "amplification_factor": amplification,
             "avg_salience_before": 0.0,
             "avg_salience_after": 0.0,
-            "internal_entropy_after": 0.0
+            "internal_entropy_after": 0.0,
         }
 
     # Calculate average salience before
@@ -1442,7 +1696,9 @@ def recirculate_high_alpha(entries: list,
     amplified_entries = [amplify_entry(e, amplification) for e in entries]
 
     # Calculate average salience after
-    avg_after = sum(e.get("salience", 1.0) for e in amplified_entries) / len(amplified_entries)
+    avg_after = sum(e.get("salience", 1.0) for e in amplified_entries) / len(
+        amplified_entries
+    )
 
     # Update entries in ledger
     ledger = _read_ledger()
@@ -1465,14 +1721,17 @@ def recirculate_high_alpha(entries: list,
     internal_entropy_after = compute_internal_entropy(updated_ledger)
 
     # Emit receipt
-    receipt = emit_receipt("high_alpha_recirculate", {
-        "tenant_id": "neuron",
-        "entries_recirculated": len(entries),
-        "amplification_factor": amplification,
-        "avg_salience_before": round(avg_before, 4),
-        "avg_salience_after": round(avg_after, 4),
-        "internal_entropy_after": round(internal_entropy_after, 4)
-    })
+    receipt = emit_receipt(
+        "high_alpha_recirculate",
+        {
+            "tenant_id": "neuron",
+            "entries_recirculated": len(entries),
+            "amplification_factor": amplification,
+            "avg_salience_before": round(avg_before, 4),
+            "avg_salience_after": round(avg_after, 4),
+            "internal_entropy_after": round(internal_entropy_after, 4),
+        },
+    )
 
     return {
         "entries_recirculated": len(entries),
@@ -1480,7 +1739,7 @@ def recirculate_high_alpha(entries: list,
         "avg_salience_before": avg_before,
         "avg_salience_after": avg_after,
         "internal_entropy_after": internal_entropy_after,
-        "receipt": receipt
+        "receipt": receipt,
     }
 
 
@@ -1488,8 +1747,10 @@ def recirculate_high_alpha(entries: list,
 # v4.4 GATE 4: GAP-TRIGGERED EXPORT
 # ============================================
 
-def detect_gap_trigger(ledger: list | None = None,
-                       threshold_minutes: float = 1.0) -> list:
+
+def detect_gap_trigger(
+    ledger: list | None = None, threshold_minutes: float = 1.0
+) -> list:
     """Detect gaps that should trigger accelerated export.
 
     v4.4: "Gaps trigger directed entropy export"
@@ -1521,20 +1782,23 @@ def detect_gap_trigger(ledger: list | None = None,
         gap_minutes = gap_seconds / 60
 
         if gap_minutes >= threshold_minutes:
-            gaps.append({
-                "start": prev["ts"],
-                "end": curr["ts"],
-                "duration_minutes": gap_minutes,
-                "from_project": prev.get("project", "neuron"),
-                "to_project": curr.get("project", "neuron"),
-                "gap_source": prev.get("project", "neuron")
-            })
+            gaps.append(
+                {
+                    "start": prev["ts"],
+                    "end": curr["ts"],
+                    "duration_minutes": gap_minutes,
+                    "from_project": prev.get("project", "neuron"),
+                    "to_project": curr.get("project", "neuron"),
+                    "gap_source": prev.get("project", "neuron"),
+                }
+            )
 
     return gaps
 
 
-def gap_directed_export(ledger: list | None = None, gap: dict | None = None,
-                        tau: float = SYSTEM_TAU_DEFAULT) -> dict:
+def gap_directed_export(
+    ledger: list | None = None, gap: dict | None = None, tau: float = SYSTEM_TAU_DEFAULT
+) -> dict:
     """Trigger accelerated export on gap detection.
 
     v4.4: "Human Nerve no longer recovers—it DIRECTS the pump"
@@ -1562,7 +1826,7 @@ def gap_directed_export(ledger: list | None = None, gap: dict | None = None,
             "export_multiplier": GAP_EXPORT_MULTIPLIER,
             "entries_exported": 0,
             "normal_export_would_be": 0,
-            "internal_entropy_after": 0.0
+            "internal_entropy_after": 0.0,
         }
 
     # Classify ledger
@@ -1588,7 +1852,9 @@ def gap_directed_export(ledger: list | None = None, gap: dict | None = None,
 
     # Perform export
     if total_export:
-        export_result = export_low_alpha(total_export, destination="stub", compress=True)
+        export_result = export_low_alpha(
+            total_export, destination="stub", compress=True
+        )
         internal_entropy_after = export_result["internal_entropy_after"]
         entries_exported = export_result["entries_exported"]
     else:
@@ -1596,15 +1862,20 @@ def gap_directed_export(ledger: list | None = None, gap: dict | None = None,
         entries_exported = 0
 
     # Emit receipt
-    receipt = emit_receipt("gap_directed_export", {
-        "tenant_id": "neuron",
-        "gap_duration_minutes": round(gap.get("duration_minutes", 0) if gap else 0, 2),
-        "gap_source": gap.get("gap_source", "unknown") if gap else "unknown",
-        "export_multiplier": GAP_EXPORT_MULTIPLIER,
-        "entries_exported": entries_exported,
-        "normal_export_would_be": normal_count,
-        "internal_entropy_after": round(internal_entropy_after, 4)
-    })
+    receipt = emit_receipt(
+        "gap_directed_export",
+        {
+            "tenant_id": "neuron",
+            "gap_duration_minutes": round(
+                gap.get("duration_minutes", 0) if gap else 0, 2
+            ),
+            "gap_source": gap.get("gap_source", "unknown") if gap else "unknown",
+            "export_multiplier": GAP_EXPORT_MULTIPLIER,
+            "entries_exported": entries_exported,
+            "normal_export_would_be": normal_count,
+            "internal_entropy_after": round(internal_entropy_after, 4),
+        },
+    )
 
     return {
         "gap_duration_minutes": gap.get("duration_minutes", 0) if gap else 0,
@@ -1613,7 +1884,7 @@ def gap_directed_export(ledger: list | None = None, gap: dict | None = None,
         "entries_exported": entries_exported,
         "normal_export_would_be": normal_count,
         "internal_entropy_after": internal_entropy_after,
-        "receipt": receipt
+        "receipt": receipt,
     }
 
 
@@ -1668,7 +1939,7 @@ def accumulate_for_burst(entries: list) -> dict:
     return {
         "entries_accumulated": len(entries),
         "queue_size": len(_burst_queue),
-        "max_batch": BURST_SYNC_MAX_BATCH
+        "max_batch": BURST_SYNC_MAX_BATCH,
     }
 
 
@@ -1697,7 +1968,7 @@ def burst_sync(destination: str = "stub") -> dict:
             "sync_duration_ms": 0,
             "efficiency_ratio": 0.0,
             "internal_entropy_before": 0.0,
-            "internal_entropy_after": 0.0
+            "internal_entropy_after": 0.0,
         }
 
     # Calculate entropy before
@@ -1707,7 +1978,9 @@ def burst_sync(destination: str = "stub") -> dict:
     entries_to_sync = list(_burst_queue)
 
     # Perform export
-    export_result = export_low_alpha(entries_to_sync, destination=destination, compress=True)
+    export_result = export_low_alpha(
+        entries_to_sync, destination=destination, compress=True
+    )
 
     # Clear queue
     _burst_queue = []
@@ -1722,17 +1995,20 @@ def burst_sync(destination: str = "stub") -> dict:
     efficiency_ratio = len(entries_to_sync) if sync_duration_ms > 0 else 0.0
 
     # Emit receipt
-    receipt = emit_receipt("burst_sync", {
-        "tenant_id": "neuron",
-        "burst_mode_active": _burst_mode_active,
-        "latency_ms": BURST_MODE_LATENCY_THRESHOLD if _burst_mode_active else 0,
-        "entries_accumulated": len(entries_to_sync),
-        "entries_synced": export_result["entries_exported"],
-        "sync_duration_ms": round(sync_duration_ms, 2),
-        "efficiency_ratio": round(efficiency_ratio, 2),
-        "internal_entropy_before": round(entropy_before, 4),
-        "internal_entropy_after": round(export_result["internal_entropy_after"], 4)
-    })
+    receipt = emit_receipt(
+        "burst_sync",
+        {
+            "tenant_id": "neuron",
+            "burst_mode_active": _burst_mode_active,
+            "latency_ms": BURST_MODE_LATENCY_THRESHOLD if _burst_mode_active else 0,
+            "entries_accumulated": len(entries_to_sync),
+            "entries_synced": export_result["entries_exported"],
+            "sync_duration_ms": round(sync_duration_ms, 2),
+            "efficiency_ratio": round(efficiency_ratio, 2),
+            "internal_entropy_before": round(entropy_before, 4),
+            "internal_entropy_after": round(export_result["internal_entropy_after"], 4),
+        },
+    )
 
     return {
         "burst_mode_active": _burst_mode_active,
@@ -1743,7 +2019,7 @@ def burst_sync(destination: str = "stub") -> dict:
         "efficiency_ratio": efficiency_ratio,
         "internal_entropy_before": entropy_before,
         "internal_entropy_after": export_result["internal_entropy_after"],
-        "receipt": receipt
+        "receipt": receipt,
     }
 
 
@@ -1758,6 +2034,7 @@ def reset_burst_state():
 # ============================================
 # v4.4 GATE 6: INTEGRATION
 # ============================================
+
 
 def pump_cycle(ledger: list | None = None, config: dict | None = None) -> dict:
     """Execute full entropy pump cycle.
@@ -1794,7 +2071,7 @@ def pump_cycle(ledger: list | None = None, config: dict | None = None) -> dict:
             "entries_recirculated_total": 0,
             "gap_triggered_exports": 0,
             "burst_syncs": 0,
-            "remaining_ledger": []
+            "remaining_ledger": [],
         }
 
     # Step 1: Classify
@@ -1839,12 +2116,13 @@ def pump_cycle(ledger: list | None = None, config: dict | None = None) -> dict:
         "entries_recirculated_total": recirculated,
         "gap_triggered_exports": 1 if gap_exports > 0 else 0,
         "burst_syncs": burst_count,
-        "remaining_ledger": remaining_ledger
+        "remaining_ledger": remaining_ledger,
     }
 
 
-def validate_entropy_target(ledger: list | None = None,
-                            target: float = INTERNAL_ENTROPY_TARGET) -> dict:
+def validate_entropy_target(
+    ledger: list | None = None, target: float = INTERNAL_ENTROPY_TARGET
+) -> dict:
     """Validate that entropy target is achieved.
 
     v4.4 Target: "near-zero internal entropy" (< 0.1)
@@ -1863,25 +2141,29 @@ def validate_entropy_target(ledger: list | None = None,
     target_achieved = current_entropy < target
 
     # Emit receipt
-    receipt = emit_receipt("entropy_validation", {
-        "tenant_id": "neuron",
-        "final_entropy": round(current_entropy, 4),
-        "target_entropy": target,
-        "target_achieved": target_achieved,
-        "ledger_size": len(ledger)
-    })
+    receipt = emit_receipt(
+        "entropy_validation",
+        {
+            "tenant_id": "neuron",
+            "final_entropy": round(current_entropy, 4),
+            "target_entropy": target,
+            "target_achieved": target_achieved,
+            "ledger_size": len(ledger),
+        },
+    )
 
     return {
         "final_entropy": current_entropy,
         "target_entropy": target,
         "target_achieved": target_achieved,
         "ledger_size": len(ledger),
-        "receipt": receipt
+        "receipt": receipt,
     }
 
 
-def run_entropy_pump_integration(max_cycles: int = 10,
-                                 target: float = INTERNAL_ENTROPY_TARGET) -> dict:
+def run_entropy_pump_integration(
+    max_cycles: int = 10, target: float = INTERNAL_ENTROPY_TARGET
+) -> dict:
     """Run full entropy pump integration until target achieved.
 
     Args:
@@ -1917,19 +2199,22 @@ def run_entropy_pump_integration(max_cycles: int = 10,
     target_achieved = final_entropy < target
 
     # Emit integration receipt
-    receipt = emit_receipt("entropy_pump_integration", {
-        "tenant_id": "neuron",
-        "version": "4.4.0",
-        "cycles_run": cycle + 1,
-        "initial_entropy": round(initial_entropy, 4),
-        "final_entropy": round(final_entropy, 4),
-        "target_entropy": target,
-        "target_achieved": target_achieved,
-        "entries_exported_total": total_exported,
-        "entries_recirculated_total": total_recirculated,
-        "gap_triggered_exports": gap_exports,
-        "burst_syncs": burst_syncs
-    })
+    receipt = emit_receipt(
+        "entropy_pump_integration",
+        {
+            "tenant_id": "neuron",
+            "version": "4.4.0",
+            "cycles_run": cycle + 1,
+            "initial_entropy": round(initial_entropy, 4),
+            "final_entropy": round(final_entropy, 4),
+            "target_entropy": target,
+            "target_achieved": target_achieved,
+            "entries_exported_total": total_exported,
+            "entries_recirculated_total": total_recirculated,
+            "gap_triggered_exports": gap_exports,
+            "burst_syncs": burst_syncs,
+        },
+    )
 
     return {
         "version": "4.4.0",
@@ -1942,20 +2227,251 @@ def run_entropy_pump_integration(max_cycles: int = 10,
         "entries_recirculated_total": total_recirculated,
         "gap_triggered_exports": gap_exports,
         "burst_syncs": burst_syncs,
-        "receipt": receipt
+        "receipt": receipt,
     }
 
 
+# ============================================
+# v4.5 GATE 3: GAP RESONANCE DRIVER
+# ============================================
+
+
+def get_current_phase() -> str:
+    """Return current oscillation phase ("inject" or "surge").
+
+    v4.5: Track oscillation state.
+
+    Returns:
+        Current phase string
+    """
+    return _oscillation_phase
+
+
+def set_oscillation_state(phase: str, amplitude: float, frequency: float) -> None:
+    """Update internal oscillation tracking.
+
+    Args:
+        phase: "inject" or "surge"
+        amplitude: Current amplitude
+        frequency: Current frequency in Hz
+    """
+    global _oscillation_phase, _oscillation_amplitude, _oscillation_frequency
+
+    if phase not in ("inject", "surge"):
+        raise StopRule(
+            "invalid_phase", f"Phase must be 'inject' or 'surge', got: {phase}"
+        )
+
+    _oscillation_phase = phase
+    _oscillation_amplitude = amplitude
+    _oscillation_frequency = frequency
+
+
+def gap_resonance_trigger(gap_event: dict) -> dict:
+    """When gap detected, trigger oscillation cycle with amplified amplitude.
+
+    v4.5: "Gap detection fires oscillation cycle (not export)"
+    "Gap energy amplifies next surge phase"
+
+    Args:
+        gap_event: Dict with source, duration_minutes
+
+    Returns:
+        resonance_driver_receipt
+    """
+    global _oscillation_amplitude
+
+    source = gap_event.get("source", "unknown")
+    duration_minutes = gap_event.get("duration_minutes", 0)
+
+    # Amplify amplitude by gap boost factor
+    amplitude_boost = GAP_AMPLITUDE_BOOST
+    boosted_amplitude = _oscillation_amplitude * amplitude_boost
+
+    # Generate cycle ID for triggered oscillation
+    triggered_cycle_id = f"gap_osc_{uuid.uuid4().hex[:8]}"
+
+    # Update state
+    _oscillation_amplitude = boosted_amplitude
+
+    # Build receipt
+    receipt = emit_receipt(
+        "resonance_driver",
+        {
+            "tenant_id": "neuron",
+            "gap_source": source,
+            "gap_duration_minutes": round(duration_minutes, 2),
+            "amplitude_boost": amplitude_boost,
+            "triggered_cycle_id": triggered_cycle_id,
+            "new_amplitude": round(boosted_amplitude, 4),
+        },
+    )
+
+    return {
+        "receipt_type": "resonance_driver",
+        "gap_source": source,
+        "gap_duration_minutes": duration_minutes,
+        "amplitude_boost": amplitude_boost,
+        "triggered_cycle_id": triggered_cycle_id,
+        "ts": receipt["ts"],
+        "hash": receipt["hash"],
+    }
+
+
+# ============================================
+# v4.5 GATE 4: HUMAN PHASE DIRECTION
+# ============================================
+
+
+def human_direct_phase(
+    direction: str, human_id: str = "human_nerve", override_reason: str = "manual"
+) -> dict:
+    """Human override: set phase to "inject" or "surge".
+
+    v4.5: "Human Nerve specifies: 'inject now' or 'surge now'"
+    "Human timing overrides automatic frequency"
+
+    Args:
+        direction: "inject" or "surge"
+        human_id: Identifier for human issuing command
+        override_reason: Reason for override
+
+    Returns:
+        human_phase_receipt
+
+    Raises:
+        ValueError: If direction is invalid
+    """
+    global _oscillation_phase
+
+    if direction not in ("inject", "surge"):
+        raise ValueError(f"Direction must be 'inject' or 'surge', got: {direction}")
+
+    previous_phase = _oscillation_phase
+    _oscillation_phase = direction
+
+    # Build receipt
+    receipt = emit_receipt(
+        "human_phase",
+        {
+            "tenant_id": "neuron",
+            "direction": direction,
+            "previous_phase": previous_phase,
+            "human_id": human_id,
+            "override_reason": override_reason,
+        },
+    )
+
+    return {
+        "receipt_type": "human_phase",
+        "direction": direction,
+        "previous_phase": previous_phase,
+        "human_id": human_id,
+        "override_reason": override_reason,
+        "ts": receipt["ts"],
+        "hash": receipt["hash"],
+    }
+
+
+# ============================================
+# v4.5 GATE 5: PHASE TRANSITION DETECTION
+# ============================================
+
+
+def detect_phase_transition(triad_state: dict) -> dict:
+    """Check AXIOM/AgentProof for state changes.
+
+    v4.5: "Monitor AXIOM law_discovery events during oscillation"
+    "Monitor AgentProof selection_threshold shifts"
+
+    Args:
+        triad_state: Dict with axiom and agentproof state
+
+    Returns:
+        phase_transition_receipt if detected, empty dict otherwise
+    """
+    axiom_state = triad_state.get("axiom", {})
+    agentproof_state = triad_state.get("agentproof", {})
+
+    # Detect AXIOM law discovery
+    axiom_transition = axiom_state.get("laws_discovered", 0) > 0
+
+    # Detect AgentProof selection shift
+    agentproof_transition = agentproof_state.get("selection_threshold", 0) > 0.5
+
+    # Determine transition type
+    if axiom_transition and agentproof_transition:
+        transition_type = "both"
+    elif axiom_transition:
+        transition_type = "axiom_law"
+    elif agentproof_transition:
+        transition_type = "agentproof_selection"
+    else:
+        transition_type = None
+
+    if transition_type is None:
+        return {
+            "receipt_type": "phase_transition",
+            "transition_type": None,
+            "detected": False,
+        }
+
+    # Calculate correlation with oscillation
+    # Simple heuristic: if we're in high amplitude, correlation is higher
+    oscillation_correlation = min(
+        1.0, _oscillation_amplitude / OSCILLATION_AMPLITUDE_DEFAULT
+    )
+
+    # Build receipt
+    receipt = emit_receipt(
+        "phase_transition",
+        {
+            "tenant_id": "neuron",
+            "transition_type": transition_type,
+            "before_state": {"axiom_laws": 0, "agentproof_threshold": 0},
+            "after_state": {
+                "axiom_laws": axiom_state.get("laws_discovered", 0),
+                "agentproof_threshold": agentproof_state.get("selection_threshold", 0),
+            },
+            "oscillation_correlation": round(oscillation_correlation, 4),
+        },
+    )
+
+    return {
+        "receipt_type": "phase_transition",
+        "transition_type": transition_type,
+        "before_state": {"axiom_laws": 0, "agentproof_threshold": 0},
+        "after_state": {
+            "axiom_laws": axiom_state.get("laws_discovered", 0),
+            "agentproof_threshold": agentproof_state.get("selection_threshold", 0),
+        },
+        "oscillation_correlation": oscillation_correlation,
+        "detected": True,
+        "ts": receipt["ts"],
+        "hash": receipt["hash"],
+    }
+
+
+def reset_oscillation_state():
+    """Reset oscillation state (for testing)."""
+    global _oscillation_phase, _oscillation_amplitude, _oscillation_frequency
+    _oscillation_phase = "inject"
+    _oscillation_amplitude = OSCILLATION_AMPLITUDE_DEFAULT
+    _oscillation_frequency = 0.001
+
+
 if __name__ == "__main__":
-    print(f"NEURON v4.4 - The Entropy Pump")
+    print("NEURON v4.5 - The Resonance Catalyst")
     print(f"Ledger: {LEDGER_PATH}")
     print(f"BLAKE3 available: {HAS_BLAKE3}")
     print(f"Shared mode: {LEDGER_SHARED_MODE}")
-    print(f"Entropy Pump mode: {ENTROPY_PUMP_MODE}")
+    print(f"Resonance mode: {RESONANCE_MODE}")
     print(f"Projects: {ALLOWED_PROJECTS}")
     print(f"Recovery curves: {RECOVERY_CURVE_MODELS}")
     print(f"Default curve: {DEFAULT_RECOVERY_CURVE}")
     print(f"Shard strategies: {SHARD_STRATEGIES}")
-    print(f"Export threshold: α < {LOW_ALPHA_EXPORT_THRESHOLD}")
-    print(f"Recirculate threshold: α ≥ {HIGH_ALPHA_RECIRCULATE_THRESHOLD}")
-    print(f"Entropy target: {INTERNAL_ENTROPY_TARGET}")
+    print(
+        f"Oscillation amplitude: {OSCILLATION_AMPLITUDE_DEFAULT} - {OSCILLATION_AMPLITUDE_MAX}"
+    )
+    print(f"Surge threshold: α ≥ {HIGH_ALPHA_SURGE_THRESHOLD}")
+    print(f"Gap boost: {GAP_AMPLITUDE_BOOST}x")

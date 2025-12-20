@@ -21,10 +21,6 @@ from neuron import (
     append_from_axiom,
     append_from_grok,
     load_ledger,
-    _read_ledger,
-    _write_ledger,
-    ALLOWED_PROJECTS,
-    AI_EVENT_TYPES,
     StopRule,
 )
 
@@ -51,8 +47,12 @@ class TestAppendHumanDefault:
 
     def test_append_human_event_types(self):
         """Test human-specific event types."""
-        entry = append(project="human", task="Interrupt", next_action="pause",
-                      event_type="human_interrupt")
+        entry = append(
+            project="human",
+            task="Interrupt",
+            next_action="pause",
+            event_type="human_interrupt",
+        )
         assert entry["event_type"] == "human_interrupt"
 
 
@@ -69,7 +69,9 @@ class TestAppendAgentproof:
 
     def test_append_from_agentproof_anchor(self):
         """Test AgentProof anchor event."""
-        entry = append_from_agentproof("anchor", {"tx_hash": "0xdef456", "block": 12345})
+        entry = append_from_agentproof(
+            "anchor", {"tx_hash": "0xdef456", "block": 12345}
+        )
         assert entry["project"] == "agentproof"
         assert entry["event_type"] == "agentproof_anchor"
 
@@ -79,7 +81,9 @@ class TestAppendAxiom:
 
     def test_append_from_axiom_discovery(self):
         """Test AXIOM law discovery event."""
-        entry = append_from_axiom("law_discovery", {"law": "V = sqrt(GM/r)", "compression": 0.94})
+        entry = append_from_axiom(
+            "law_discovery", {"law": "V = sqrt(GM/r)", "compression": 0.94}
+        )
         assert entry["project"] == "axiom"
         assert entry["event_type"] == "axiom_law_discovery"
         assert entry["source_context"]["law"] == "V = sqrt(GM/r)"
@@ -147,8 +151,9 @@ class TestSourceContextPreserved:
     def test_source_context_preserved(self):
         """Test source_context is preserved in entry."""
         context = {"key1": "value1", "key2": 123, "nested": {"a": 1}}
-        entry = append(project="neuron", task="test", next_action="test",
-                      source_context=context)
+        entry = append(
+            project="neuron", task="test", next_action="test", source_context=context
+        )
 
         assert entry["source_context"]["key1"] == "value1"
         assert entry["source_context"]["key2"] == 123
@@ -177,13 +182,18 @@ class TestEventTypeValidation:
 
     def test_unknown_event_type_defaults(self):
         """Test that unknown event type defaults to 'unknown'."""
-        entry = append(project="neuron", task="test", next_action="test",
-                      event_type="totally_invalid")
+        entry = append(
+            project="neuron",
+            task="test",
+            next_action="test",
+            event_type="totally_invalid",
+        )
         assert entry["event_type"] == "unknown"
 
     def test_valid_event_types_accepted(self):
         """Test that valid event types are accepted."""
         for event_type in ["task", "eviction", "rollback", "discovery"]:
-            entry = append(project="neuron", task="test", next_action="test",
-                          event_type=event_type)
+            entry = append(
+                project="neuron", task="test", next_action="test", event_type=event_type
+            )
             assert entry["event_type"] == event_type

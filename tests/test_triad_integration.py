@@ -14,7 +14,9 @@ _test_dir = tempfile.mkdtemp()
 os.environ["NEURON_LEDGER"] = str(Path(_test_dir) / "test_receipts.jsonl")
 os.environ["NEURON_ARCHIVE"] = str(Path(_test_dir) / "test_archive.jsonl")
 os.environ["NEURON_RECEIPTS"] = str(Path(_test_dir) / "test_stress_receipts.jsonl")
-os.environ["NEURON_STRESS_RECEIPTS"] = str(Path(_test_dir) / "test_stress_receipts.jsonl")
+os.environ["NEURON_STRESS_RECEIPTS"] = str(
+    Path(_test_dir) / "test_stress_receipts.jsonl"
+)
 
 from stress import triad_simulation
 
@@ -51,7 +53,9 @@ class TestAllProjectsRepresented:
         result = triad_simulation(n_events=100, prune_threshold=100)
 
         events_by_project = result["events_by_project"]
-        assert len(events_by_project) >= 3, f"Expected 3+ projects, got {events_by_project}"
+        assert len(events_by_project) >= 3, (
+            f"Expected 3+ projects, got {events_by_project}"
+        )
 
 
 class TestSystemAlphaReasonable:
@@ -82,7 +86,9 @@ class TestAIAutoEventsPresent:
 
     def test_ai_auto_events_present(self):
         """Test that AI auto-triggered events are present."""
-        result = triad_simulation(n_events=100, include_stress=True, prune_threshold=100)
+        result = triad_simulation(
+            n_events=100, include_stress=True, prune_threshold=100
+        )
 
         assert result["ai_auto_events"] > 0
 
@@ -126,7 +132,9 @@ class TestBioSiliconContinuity:
         """Test that no gaps exceed 24 hours."""
         result = triad_simulation(n_events=100, prune_threshold=100)
 
-        assert result["max_gap_hours"] < 24, f"Gap of {result['max_gap_hours']}h exceeds 24h"
+        assert result["max_gap_hours"] < 24, (
+            f"Gap of {result['max_gap_hours']}h exceeds 24h"
+        )
 
     def test_invariants_pass(self):
         """Test that all invariants pass."""

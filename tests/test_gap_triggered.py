@@ -5,7 +5,6 @@ Test gap detection and accelerated export.
 
 import os
 import tempfile
-import time
 
 # Set up isolated test environment BEFORE importing neuron
 _test_dir = tempfile.mkdtemp()
@@ -17,7 +16,6 @@ os.environ["NEURON_BASE"] = _test_dir
 import pytest
 from datetime import datetime, timezone, timedelta
 
-import neuron
 from neuron import (
     detect_gap_trigger,
     gap_directed_export,
@@ -32,7 +30,12 @@ from neuron import (
 @pytest.fixture(autouse=True)
 def clean_ledger():
     """Clean ledger files before and after each test."""
-    from neuron import _get_ledger_path, _get_archive_path, _get_receipts_path, _get_stub_path
+    from neuron import (
+        _get_ledger_path,
+        _get_archive_path,
+        _get_receipts_path,
+        _get_stub_path,
+    )
     import shutil
 
     for path_fn in [_get_ledger_path, _get_archive_path, _get_receipts_path]:
@@ -63,22 +66,14 @@ class TestDetectGapHuman:
         # Create entries with gap
         now = datetime.now(timezone.utc)
 
-        entry1 = append(
-            project="human",
-            task="before gap",
-            next_action="wait"
-        )
+        entry1 = append(project="human", task="before gap", next_action="wait")
 
         # Modify timestamp to create gap
         ledger = load_ledger()
         ledger[0]["ts"] = (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
         _write_ledger(ledger)
 
-        entry2 = append(
-            project="human",
-            task="after gap",
-            next_action="continue"
-        )
+        entry2 = append(project="human", task="after gap", next_action="continue")
 
         gaps = detect_gap_trigger(load_ledger(), threshold_minutes=60)
 
@@ -93,21 +88,13 @@ class TestDetectGapGrok:
         """Grok gaps should be detected."""
         now = datetime.now(timezone.utc)
 
-        entry1 = append(
-            project="grok",
-            task="before eviction",
-            next_action="wait"
-        )
+        entry1 = append(project="grok", task="before eviction", next_action="wait")
 
         ledger = load_ledger()
         ledger[0]["ts"] = (now - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
         _write_ledger(ledger)
 
-        entry2 = append(
-            project="grok",
-            task="after eviction",
-            next_action="continue"
-        )
+        entry2 = append(project="grok", task="after eviction", next_action="continue")
 
         gaps = detect_gap_trigger(load_ledger(), threshold_minutes=60)
 
@@ -125,10 +112,7 @@ class TestGapTriggersExport:
         # Create entries with various saliences
         for i in range(5):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.2
+                project="neuron", task=f"task {i}", next_action="process", salience=0.2
             )
 
         # Age entries and create gap
@@ -158,10 +142,7 @@ class TestMultiplierApplied:
         # Create many entries
         for i in range(20):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.2
+                project="neuron", task=f"task {i}", next_action="process", salience=0.2
             )
 
         # Age entries
@@ -189,10 +170,7 @@ class TestEntropyDropsOnGap:
 
         for i in range(10):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.2
+                project="neuron", task=f"task {i}", next_action="process", salience=0.2
             )
 
         ledger = load_ledger()
@@ -220,10 +198,7 @@ class TestGapReceiptShowsMultiplier:
 
         for i in range(10):
             append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process",
-                salience=0.2
+                project="neuron", task=f"task {i}", next_action="process", salience=0.2
             )
 
         ledger = load_ledger()
@@ -248,11 +223,7 @@ class TestNoGapNoTrigger:
         """Small gaps should be ignored."""
         # Create entries close together
         for i in range(5):
-            append(
-                project="neuron",
-                task=f"task {i}",
-                next_action="process"
-            )
+            append(project="neuron", task=f"task {i}", next_action="process")
 
         # No artificial gaps - entries are close in time
         gaps = detect_gap_trigger(load_ledger(), threshold_minutes=60)
@@ -268,21 +239,13 @@ class TestGapSource:
         """Gap source project should be recorded."""
         now = datetime.now(timezone.utc)
 
-        entry1 = append(
-            project="axiom",
-            task="before gap",
-            next_action="wait"
-        )
+        entry1 = append(project="axiom", task="before gap", next_action="wait")
 
         ledger = load_ledger()
         ledger[0]["ts"] = (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
         _write_ledger(ledger)
 
-        entry2 = append(
-            project="axiom",
-            task="after gap",
-            next_action="continue"
-        )
+        entry2 = append(project="axiom", task="after gap", next_action="continue")
 
         gaps = detect_gap_trigger(load_ledger(), threshold_minutes=60)
 
