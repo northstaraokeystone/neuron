@@ -1,0 +1,28 @@
+{
+  "frequencies": {
+    "HUMAN_CIRCADIAN": {
+      "period_seconds": 86400,
+      "description": "24-hour human attention cycle"
+    },
+    "HUMAN_FOCUS": {
+      "period_seconds": 5400,
+      "description": "90-minute ultradian focus rhythm"
+    },
+    "GROK_TOKEN_REFRESH": {
+      "compute": "dynamic",
+      "base_tokens": 8192,
+      "tokens_per_second": 100,
+      "description": "Context window refresh cycle"
+    },
+    "MARS_LIGHT_DELAY": {
+      "period_range": [180, 1320],
+      "description": "3-22 minute one-way light time"
+    },
+    "INTERSTELLAR_BURST": {
+      "period_seconds": 126000000,
+      "description": "4-year Proxima Centauri cycle"
+    }
+  },
+  "default": "HUMAN_FOCUS",
+  "adaptive_enabled": true
+}
