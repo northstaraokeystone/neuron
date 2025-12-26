@@ -261,6 +261,13 @@ SELF_CONDUCT_ENABLED = True  # Chain conducts itself
 PERSISTENCE_WINDOW_ENTRIES = 1000  # History window for survival analysis
 MIN_GAP_MS_FOR_RHYTHM = 100  # Minimum gap to register in rhythm
 
+# ============================================
+# v5.0 RESONANCE CONSOLIDATION CONSTANTS
+# ============================================
+TOP_K_RETRIEVAL = 16  # Top-k digital vectors per query
+PRUNE_THRESHOLD_RESONANCE = 0.3  # Low-salience pruning threshold
+SWR_SYNC_MAX_CYCLES = 10  # Maximum consolidation cycles per SWR
+
 
 # CLAUDEME §8 Core Exception
 class StopRule(Exception):
@@ -2230,6 +2237,263 @@ def run_entropy_pump_integration(
 # - human_meta_append: Optional human harmony (not direction)
 # - verify_self_conduct: Confirm emergent orchestration
 # - detect_induced_oscillation: Resurrection guard
+
+
+# ============================================
+# v5.0 SWR-SYNCHRONIZED CONSOLIDATION
+# ============================================
+
+
+def superpose_vectors(
+    bio_vector: list[float], digital_vectors: list[list[float]]
+) -> list[float]:
+    """Add bio + mean(digital), re-normalize. Creates bound memory.
+
+    v5.0: Bidirectional bio-digital binding.
+
+    Args:
+        bio_vector: Biological SDM vector
+        digital_vectors: List of digital SDM vectors from retrieval
+
+    Returns:
+        Superposed and re-normalized vector
+    """
+    if not bio_vector:
+        return []
+
+    if not digital_vectors:
+        return list(bio_vector)
+
+    dim = len(bio_vector)
+
+    # Compute mean of digital vectors
+    digital_mean = [0.0] * dim
+    for dv in digital_vectors:
+        if len(dv) != dim:
+            continue
+        for i in range(dim):
+            digital_mean[i] += dv[i]
+
+    n = len(digital_vectors)
+    if n > 0:
+        digital_mean = [v / n for v in digital_mean]
+
+    # Superpose: bio + digital_mean
+    superposed = [b + d for b, d in zip(bio_vector, digital_mean)]
+
+    # Re-normalize to unit sphere
+    norm = math.sqrt(sum(v * v for v in superposed))
+    if norm > 0:
+        superposed = [v / norm for v in superposed]
+
+    return superposed
+
+
+def create_bio_sync_metadata(
+    bio_vector_hash: str, digital_vector_hashes: list[str], salience: float
+) -> dict:
+    """Create metadata for bio-synced entries.
+
+    v5.0: Tracks provenance of bio-digital consolidation.
+
+    Args:
+        bio_vector_hash: Hash of biological source vector
+        digital_vector_hashes: Hashes of retrieved digital vectors
+        salience: Computed salience of the bound memory
+
+    Returns:
+        Metadata dict for source="bio_swr_sync"
+    """
+    return {
+        "source": "bio_swr_sync",
+        "bio_vector_hash": bio_vector_hash,
+        "digital_vector_hashes": digital_vector_hashes,
+        "digital_count": len(digital_vector_hashes),
+        "salience": salience,
+        "sync_ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+
+def retrieve_top_k_vectors(
+    query_vector: list[float], ledger: list[dict], top_k: int = TOP_K_RETRIEVAL
+) -> list[dict]:
+    """Retrieve top-k similar entries from ledger based on query vector.
+
+    Simplified similarity using salience and recency as proxy.
+    In full implementation, would use proper SDM similarity.
+
+    Args:
+        query_vector: SDM query vector
+        ledger: NEURON ledger entries
+        top_k: Number of entries to retrieve
+
+    Returns:
+        Top-k ledger entries by relevance
+    """
+    if not ledger:
+        return []
+
+    # Score entries by salience * recency factor
+    now = datetime.now(timezone.utc)
+    scored = []
+
+    for entry in ledger:
+        salience = entry.get("salience", 0.5)
+        try:
+            entry_ts = datetime.fromisoformat(entry["ts"].replace("Z", "+00:00"))
+            age_hours = (now - entry_ts).total_seconds() / 3600
+            recency = math.exp(-age_hours / 24)  # Decay over 24 hours
+        except (KeyError, ValueError):
+            recency = 0.5
+
+        score = salience * recency
+        scored.append((entry, score))
+
+    # Sort by score descending
+    scored.sort(key=lambda x: x[1], reverse=True)
+
+    return [entry for entry, _ in scored[:top_k]]
+
+
+def consolidate_swr_sync(
+    user_id: str,
+    bio_vector: list[float],
+    config: dict,
+    swr_detected: bool = True,
+    max_cycles: int = SWR_SYNC_MAX_CYCLES,
+) -> dict:
+    """SWR-synchronized bidirectional consolidation.
+
+    v5.0 Main SWR-synchronized consolidation loop:
+        While SWR detected:
+            bio-vector → retrieve → superpose → append → stimulate → prune
+
+    Args:
+        user_id: User identifier for multi-tenant
+        bio_vector: Biological SDM query vector
+        config: Resonance configuration dict
+        swr_detected: Whether SWR was detected (triggers sync)
+        max_cycles: Maximum consolidation cycles
+
+    Returns:
+        Dict with cycles, entries_added, entries_pruned, and consolidate_sync_receipt
+    """
+    if not swr_detected:
+        return {
+            "cycles": 0,
+            "entries_added": 0,
+            "entries_pruned": 0,
+            "swr_triggered": False,
+        }
+
+    ledger = _read_ledger()
+    prune_threshold = config.get("prune_threshold", PRUNE_THRESHOLD_RESONANCE)
+    top_k = config.get("top_k_retrieval", TOP_K_RETRIEVAL)
+
+    entries_added = 0
+    entries_pruned = 0
+    cycles = 0
+
+    bio_vector_hash = dual_hash(json.dumps([round(v, 8) for v in bio_vector]))
+
+    for cycle in range(max_cycles):
+        cycles += 1
+
+        # Step 1: Retrieve top-k digital matches
+        top_k_entries = retrieve_top_k_vectors(bio_vector, ledger, top_k)
+        if not top_k_entries:
+            break
+
+        # Extract digital vector hashes (using entry hashes as proxy)
+        digital_hashes = [e.get("hash", "")[:32] for e in top_k_entries]
+
+        # Step 2: Superpose bio + digital vectors
+        # In full implementation, entries would have associated vectors
+        # Here we use salience boosting as the consolidation mechanism
+        salience_sum = sum(e.get("salience", 0.5) for e in top_k_entries)
+        avg_salience = salience_sum / len(top_k_entries) if top_k_entries else 0.5
+
+        # Step 3: Create bio-sync metadata
+        metadata = create_bio_sync_metadata(
+            bio_vector_hash, digital_hashes, avg_salience
+        )
+
+        # Step 4: Boost salience of top-k entries (simulates stimulation)
+        all_entries = _read_ledger()
+        top_k_hashes = {e.get("hash") for e in top_k_entries}
+
+        for entry in all_entries:
+            if entry.get("hash") in top_k_hashes:
+                old_salience = entry.get("salience", 0.5)
+                # Boost by 10%, capped at 1.0
+                entry["salience"] = min(1.0, old_salience * 1.1)
+                entry["replay_count"] = entry.get("replay_count", 0) + 1
+                entry.setdefault("source_context", {}).update(
+                    {
+                        "bio_sync": True,
+                        "bio_vector_hash": bio_vector_hash[:32],
+                    }
+                )
+
+        # Step 5: Append consolidated entry
+        append(
+            project="neuron",
+            task=f"bio_swr_sync_cycle_{cycle}",
+            next_action="continue_consolidation",
+            model="neuron",
+            salience=avg_salience,
+            source_context=metadata,
+            event_type="discovery",
+        )
+        entries_added += 1
+
+        # Step 6: Prune low-salience entries
+        prune_candidates = [
+            e
+            for e in all_entries
+            if e.get("salience", 1.0) < prune_threshold
+            and e.get("replay_count", 0) < MIN_REPLAY_TO_PRESERVE
+        ]
+
+        if prune_candidates:
+            # Mark for pruning by reducing salience further
+            for entry in prune_candidates:
+                entry["salience"] = entry.get("salience", 0.5) * 0.5
+            entries_pruned += len(prune_candidates)
+
+        _write_ledger(all_entries)
+        ledger = all_entries
+
+        # Check if we should continue (diminishing returns)
+        if avg_salience > 0.9:
+            break  # High salience achieved
+
+    # Compute bound hash
+    bound_hash = dual_hash(f"{bio_vector_hash}:{cycles}:{entries_added}")
+
+    # Emit consolidate_sync_receipt
+    receipt = emit_receipt(
+        "consolidate_sync",
+        {
+            "user_id": user_id,
+            "cycles": cycles,
+            "entries_added": entries_added,
+            "entries_pruned": entries_pruned,
+            "bio_vector_hash": bio_vector_hash[:32],
+            "digital_count": len(digital_hashes) if "digital_hashes" in dir() else 0,
+            "bound_hash": bound_hash[:32],
+        },
+    )
+
+    return {
+        "cycles": cycles,
+        "entries_added": entries_added,
+        "entries_pruned": entries_pruned,
+        "swr_triggered": True,
+        "bio_vector_hash": bio_vector_hash,
+        "bound_hash": bound_hash,
+        "_receipt": receipt,
+    }
 
 
 if __name__ == "__main__":
