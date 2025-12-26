@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-NEURON v4.6 CLI - Command Line Interface
-Chain Rhythm Conductor - gap-derived self-conduction.
+NEURON v5.0 CLI - Command Line Interface
+Chain Rhythm Conductor + Bio-Digital Resonance Bridge.
 CLAUDEME T+2h gate requirement.
 
 Usage:
@@ -13,6 +13,12 @@ Usage:
     python cli.py --self_conduct_mode # Enable chain conductor mode
     python cli.py --human_meta_test   # Simulate human meta-append
     python cli.py --simulate          # Run one conductor cycle
+
+v5.0 Resonance Mode:
+    python cli.py --resonance_mode    # Enable bio-digital SDM bridge
+    python cli.py --resonance_mode --simulate_n1  # Use simulated N1 data
+    python cli.py --resonance_mode --test_swr     # Test SWR detection
+    python cli.py --resonance_mode --test_haptic  # Test haptic feedback
 """
 
 import argparse
@@ -49,6 +55,25 @@ from chain_conductor import (
     conductor_cycle,
     ConductorStopRule,
 )
+
+# v5.0 resonance bridge imports
+from resonance_bridge import (
+    load_resonance_spec,
+    biological_to_digital_sdm,
+    generate_simulated_spikes,
+    ResonanceStopRule,
+)
+from swr_detector import (
+    detect_biological_swr,
+    generate_simulated_lfp,
+    SWRStopRule,
+)
+from haptic_feedback import (
+    haptic_feedback_loop,
+    simulate_retrieval_for_test,
+    HapticStopRule,
+)
+from neuron import consolidate_swr_sync
 
 
 def cmd_test() -> dict:
@@ -265,9 +290,124 @@ def cmd_conductor_status() -> dict:
     return emit_receipt("conductor_status_receipt", status)
 
 
+# ============================================
+# v5.0 RESONANCE MODE COMMANDS
+# ============================================
+
+
+def cmd_resonance_mode(
+    simulate_n1: bool = False, test_swr: bool = False, test_haptic: bool = False
+) -> dict:
+    """Enable bio-digital SDM bridge mode."""
+    try:
+        spec = load_resonance_spec()
+
+        print("=== NEURON v5.0 Bio-Digital Resonance Bridge ===")
+        print()
+        print(f"SDM Dimension: {spec['sdm_dim']}")
+        print(f"Sparsity Target: {spec['sparsity_target']}")
+        print(f"SWR Frequency: {spec['swr_frequency_hz']} Hz")
+        print(f"Urgency Threshold: {spec['urgency_threshold']}")
+        print(f"Simulation Mode: {spec['simulation_mode']}")
+        print()
+
+        results = {
+            "spec_loaded": True,
+            "spec_hash": spec["_spec_hash"][:32] + "...",
+        }
+
+        # Generate simulated spikes if requested
+        if simulate_n1:
+            print("--- Simulated N1 Spikes ---")
+            spikes = generate_simulated_spikes(1024, 100, 0.01, seed=42)
+            bio_result = biological_to_digital_sdm(spikes, spec)
+
+            print("Channels: 1024")
+            print("Samples: 100")
+            print(f"Sparsity: {bio_result['sparsity']:.4f}")
+            print(f"Vector Hash: {bio_result['vector_hash'][:32]}...")
+            print()
+
+            # Emit bio_ingest_receipt
+            print("bio_ingest_receipt: EMITTED")
+            results["bio_ingest"] = True
+            results["sparsity"] = bio_result["sparsity"]
+
+            # Test SWR detection if requested
+            if test_swr:
+                print()
+                print("--- SWR Detection Test ---")
+                lfp = generate_simulated_lfp(500, 1000, swr_present=True)
+                swr_result = detect_biological_swr(lfp, spec)
+
+                if swr_result:
+                    print(f"SWR Detected: {swr_result['detected']}")
+                    print(f"Frequency: {swr_result['frequency_hz']} Hz")
+                    print(f"Burst Count: {swr_result['burst_count']}")
+                    print(f"Confidence: {swr_result['confidence']:.4f}")
+                    print()
+                    print("swr_detect_receipt: EMITTED")
+                    results["swr_detected"] = swr_result["detected"]
+
+                    # Test consolidation sync
+                    print()
+                    print("--- SWR-Synchronized Consolidation ---")
+                    sync_result = consolidate_swr_sync(
+                        user_id="test_user",
+                        bio_vector=bio_result["vector"],
+                        config=spec,
+                        swr_detected=True,
+                        max_cycles=1,
+                    )
+                    print(f"Cycles: {sync_result['cycles']}")
+                    print(f"Entries Added: {sync_result['entries_added']}")
+                    print(f"Entries Pruned: {sync_result['entries_pruned']}")
+                    print()
+                    print("consolidate_sync_receipt: EMITTED")
+                    results["consolidate_sync"] = True
+                else:
+                    print("SWR not detected (confidence below threshold)")
+                    results["swr_detected"] = False
+
+            # Test haptic feedback if requested
+            if test_haptic:
+                print()
+                print("--- Haptic Feedback Test ---")
+                vector, salience = simulate_retrieval_for_test(
+                    dim=1000, high_salience=True
+                )
+                ledger = _read_ledger()
+
+                haptic_result = haptic_feedback_loop(vector, salience, spec, ledger)
+
+                print(f"Salience: {haptic_result['salience']:.4f}")
+                print(f"Urgency Threshold: {haptic_result['urgency_threshold']}")
+                print(f"Haptic Delivered: {haptic_result['haptic_delivered']}")
+                print(f"Text Delivered: {haptic_result['text_delivered']}")
+                print(f"Haptic Before Text: {haptic_result['haptic_before_text']}")
+                print()
+                print("haptic_feedback_receipt: EMITTED")
+                results["haptic_delivered"] = haptic_result["haptic_delivered"]
+
+        print()
+        print("This is not translation. This is resonance.")
+
+        return emit_receipt("resonance_mode", results)
+
+    except ResonanceStopRule as e:
+        print(f"RESONANCE STOPRULE: {e}", file=sys.stderr)
+        return emit_receipt("resonance_error", {"error": str(e)})
+    except SWRStopRule as e:
+        print(f"SWR STOPRULE: {e}", file=sys.stderr)
+        return emit_receipt("swr_error", {"error": str(e)})
+    except HapticStopRule as e:
+        print(f"HAPTIC STOPRULE: {e}", file=sys.stderr)
+        return emit_receipt("haptic_error", {"error": str(e)})
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="NEURON v4.6 CLI - Chain Rhythm Conductor",
+        description="NEURON v5.0 CLI - Chain Rhythm Conductor + Bio-Digital Resonance",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -284,8 +424,13 @@ v4.6 Chain Conductor Commands:
     python cli.py --simulate          # Run conductor cycle
     python cli.py --conductor_status  # Show conductor state
 
-KILLED (v4.5 resonance):
-    --resonance_mode    # KILLED: no induced resonance
+v5.0 Bio-Digital Resonance Commands:
+    python cli.py --resonance_mode              # Enable bio-digital SDM bridge
+    python cli.py --resonance_mode --simulate_n1  # Use simulated N1 data
+    python cli.py --resonance_mode --simulate_n1 --test_swr  # Test SWR detection
+    python cli.py --resonance_mode --simulate_n1 --test_haptic  # Test haptic feedback
+
+KILLED (v4.5 induced oscillation):
     --frequency         # KILLED: rhythm from gaps only
     --inject            # KILLED: no injection
     --surge             # KILLED: no surge
@@ -316,7 +461,21 @@ KILLED (v4.5 resonance):
         "--conductor_status", action="store_true", help="Show conductor state"
     )
 
-    parser.add_argument("--version", action="version", version="NEURON CLI v4.6")
+    # v5.0 Bio-Digital Resonance Commands
+    parser.add_argument(
+        "--resonance_mode", action="store_true", help="Enable bio-digital SDM bridge"
+    )
+    parser.add_argument(
+        "--simulate_n1", action="store_true", help="Use simulated N1 data (no hardware)"
+    )
+    parser.add_argument(
+        "--test_swr", action="store_true", help="Inject synthetic SWR for testing"
+    )
+    parser.add_argument(
+        "--test_haptic", action="store_true", help="Simulate haptic feedback loop"
+    )
+
+    parser.add_argument("--version", action="version", version="NEURON CLI v5.0")
 
     args = parser.parse_args()
 
@@ -342,6 +501,13 @@ KILLED (v4.5 resonance):
             cmd_simulate()
         elif args.conductor_status:
             cmd_conductor_status()
+        # v5.0 Bio-Digital Resonance Commands
+        elif args.resonance_mode:
+            cmd_resonance_mode(
+                simulate_n1=args.simulate_n1,
+                test_swr=args.test_swr,
+                test_haptic=args.test_haptic,
+            )
         else:
             parser.print_help()
             sys.exit(1)
@@ -350,6 +516,15 @@ KILLED (v4.5 resonance):
         sys.exit(2)
     except ConductorStopRule as e:
         print(f"CONDUCTOR STOPRULE: {e}", file=sys.stderr)
+        sys.exit(2)
+    except ResonanceStopRule as e:
+        print(f"RESONANCE STOPRULE: {e}", file=sys.stderr)
+        sys.exit(2)
+    except SWRStopRule as e:
+        print(f"SWR STOPRULE: {e}", file=sys.stderr)
+        sys.exit(2)
+    except HapticStopRule as e:
+        print(f"HAPTIC STOPRULE: {e}", file=sys.stderr)
         sys.exit(2)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)

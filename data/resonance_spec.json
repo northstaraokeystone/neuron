@@ -1,0 +1,16 @@
+{
+  "sdm_dim": 16384,
+  "n1_channels_range": [1024, 4096],
+  "window_ms": 100,
+  "sparsity_target": 0.01,
+  "sparsity_max": 0.05,
+  "swr_frequency_hz": [150, 250],
+  "swr_confidence_threshold": 0.8,
+  "urgency_threshold": 0.8,
+  "stim_duration_ms": 200,
+  "stim_intensity_max": 1.0,
+  "stim_regions": ["insula", "amygdala", "somatosensory_cortex"],
+  "prune_threshold": 0.3,
+  "top_k_retrieval": 16,
+  "simulation_mode": true
+}
