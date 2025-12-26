@@ -1,0 +1,73 @@
+# RESONANCE PROTOCOL v2.0 - MANIFEST.anchor
+# Neurophysiology Research Infrastructure
+
+VERSION: 2.0.0
+CREATED: 2025-12-26
+AUTHOR: Claude Code (claude-opus-4-5-20251101)
+
+## PARADIGM INVERSION
+
+OLD: Build separate neural processing system disconnected from QED/ProofPack
+NEW: Extend QED/ProofPack to neurophysiology - receipts ARE neural state
+
+## CORE INSIGHT
+
+The brain is an entropy-fighting system. Thread retraction is mechanically
+inevitable. HDC's holographic robustness is not optimization - it's physical
+necessity. Federated sovereignty is not feature - it's architecture.
+
+## MODULE MANIFEST
+
+src/core.py          - Neural primitives, dual-hash, thermal limits
+src/hdc.py           - Hyperdimensional Computing encoder (10k-bit)
+src/oscillation_detector.py - SWR/Spindle/SO detection (<2ms latency)
+src/phase_predictor.py      - Phase-locking prediction (pi/4 error target)
+src/federated_coordinator.py - FL aggregation (raw data never transmitted)
+src/stim_controller.py       - Stimulation safety (Shannon limit)
+src/thread_monitor.py        - Channel quality tracking
+src/entropy.py               - HDC vector entropy measurement
+
+## RECEIPT TYPES
+
+hdc_encoding_receipt    - HDC encoding operations
+swr_detection_receipt   - Sharp-Wave Ripple detection events
+fl_update_receipt       - Federated learning updates
+phase_lock_receipt      - Phase prediction and locking
+channel_quality_receipt - Thread/electrode quality
+stimulation_receipt     - Stimulation pulses
+thermal_violation_receipt - Safety limit violations
+
+## KILLED
+
+- Cloud-based neural processing (latency physics impossible)
+- Global neural data aggregation (privacy violation)
+- Fixed CNN architecture (fails on thread retraction)
+- Suprathreshold stimulation (too crude)
+- Single-hash verification (CLAUDEME requires dual-hash)
+
+## CONSTANTS
+
+HDC_DIMENSION = 10000
+N1_CHANNELS = 1024
+PHASE_LOCK_LATENCY_MS = 2.0
+STIM_CHARGE_DENSITY_LIMIT = 30.0 uC/cm^2
+THERMAL_LIMIT_DELTA_C = 1.0
+CHANNEL_DROPOUT_TOLERANCE = 0.30
+
+## GATE SEQUENCE
+
+Gate 1: HDC_FOUNDATION (orthogonality, dropout robustness)
+Gate 2: OSCILLATION_DETECTION (latency <2ms)
+Gate 3: FEDERATED_INFRASTRUCTURE (zero raw data)
+Gate 4: PHASE_LOCKING (error <pi/4 rad)
+Gate 5: SAFETY_COMPLIANCE (Shannon limit)
+Gate 6: INTEGRATION (end-to-end pipeline)
+
+## PHYSICS VALIDATED
+
+QED Compression: HDC holographic robustness parallels QED's 0.999 recall
+ProofPack Sovereignty: FL raw-data-never-leaves parallels local receipts
+AXIOM Constraints: <2ms latency is physics, not performance target
+
+---
+No receipt -> not real. Ship at T+24h or kill.

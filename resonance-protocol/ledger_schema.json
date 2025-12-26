@@ -1,0 +1,148 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RESONANCE PROTOCOL Receipt Schemas",
+  "description": "Receipt type definitions for neurophysiology research infrastructure",
+  "definitions": {
+    "base_receipt": {
+      "type": "object",
+      "required": ["type", "ts", "hash"],
+      "properties": {
+        "type": {"type": "string"},
+        "ts": {"type": "string", "format": "date-time"},
+        "hash": {"type": "string", "pattern": "^[a-f0-9]{64}:[a-f0-9]{64}$"}
+      }
+    },
+    "hdc_encoding_receipt": {
+      "allOf": [
+        {"$ref": "#/definitions/base_receipt"},
+        {
+          "properties": {
+            "type": {"const": "hdc_encoding"},
+            "input_channels": {"type": "integer", "minimum": 1, "maximum": 4096},
+            "hypervector_dim": {"type": "integer", "minimum": 1000, "maximum": 100000},
+            "encoding_method": {"type": "string"},
+            "dropout_rate": {"type": "number", "minimum": 0, "maximum": 1},
+            "vector_hash": {"type": "string"}
+          },
+          "required": ["input_channels", "hypervector_dim", "encoding_method", "vector_hash"]
+        }
+      ]
+    },
+    "swr_detection_receipt": {
+      "allOf": [
+        {"$ref": "#/definitions/base_receipt"},
+        {
+          "properties": {
+            "type": {"const": "swr_detection"},
+            "event_type": {"type": "string", "enum": ["swr", "spindle", "so_up_phase", "so_down_phase"]},
+            "frequency_hz": {"type": "number", "minimum": 0, "maximum": 500},
+            "amplitude": {"type": "number"},
+            "timestamp_ns": {"type": "integer"}
+          },
+          "required": ["event_type", "frequency_hz", "timestamp_ns"]
+        }
+      ]
+    },
+    "fl_update_receipt": {
+      "allOf": [
+        {"$ref": "#/definitions/base_receipt"},
+        {
+          "properties": {
+            "type": {"const": "fl_update"},
+            "model_delta_hash": {"type": "string"},
+            "n_local_samples": {"type": "integer", "minimum": 0},
+            "gradient_norm": {"type": "number", "minimum": 0},
+            "privacy_budget": {"type": "number", "minimum": 0}
+          },
+          "required": ["model_delta_hash", "n_local_samples", "gradient_norm", "privacy_budget"]
+        }
+      ]
+    },
+    "phase_lock_receipt": {
+      "allOf": [
+        {"$ref": "#/definitions/base_receipt"},
+        {
+          "properties": {
+            "type": {"const": "phase_lock"},
+            "target_oscillation": {"type": "string", "enum": ["swr", "spindle", "so"]},
+            "predicted_phase": {"type": "number"},
+            "actual_phase": {"type": "number"},
+            "phase_error_rad": {"type": "number"},
+            "lock_error_ms": {"type": "number"},
+            "within_tolerance": {"type": "boolean"}
+          },
+          "required": ["target_oscillation", "predicted_phase", "actual_phase", "within_tolerance"]
+        }
+      ]
+    },
+    "channel_quality_receipt": {
+      "allOf": [
+        {"$ref": "#/definitions/base_receipt"},
+        {
+          "properties": {
+            "type": {"const": "channel_quality"},
+            "channel_id": {"type": "integer", "minimum": 0, "maximum": 4095},
+            "snr_db": {"type": "number"},
+            "impedance_kohm": {"type": "number", "minimum": 0},
+            "retraction_estimate_mm": {"type": "number", "minimum": 0},
+            "status": {"type": "string", "enum": ["good", "degraded", "review_required", "unknown"]}
+          },
+          "required": ["channel_id", "snr_db", "impedance_kohm", "status"]
+        }
+      ]
+    },
+    "stimulation_receipt": {
+      "allOf": [
+        {"$ref": "#/definitions/base_receipt"},
+        {
+          "properties": {
+            "type": {"const": "stimulation"},
+            "target_region": {"type": "string"},
+            "charge_density": {"type": "number", "minimum": 0, "maximum": 100},
+            "pulse_width_us": {"type": "number", "minimum": 0},
+            "safety_check_passed": {"type": "boolean"}
+          },
+          "required": ["target_region", "charge_density", "safety_check_passed"]
+        }
+      ]
+    },
+    "thermal_violation_receipt": {
+      "allOf": [
+        {"$ref": "#/definitions/base_receipt"},
+        {
+          "properties": {
+            "type": {"const": "thermal_violation"},
+            "current_temp_c": {"type": "number"},
+            "baseline_temp_c": {"type": "number"},
+            "delta_t": {"type": "number"},
+            "limit_c": {"type": "number"}
+          },
+          "required": ["current_temp_c", "baseline_temp_c", "delta_t", "limit_c"]
+        }
+      ]
+    },
+    "entropy_measurement_receipt": {
+      "allOf": [
+        {"$ref": "#/definitions/base_receipt"},
+        {
+          "properties": {
+            "type": {"const": "entropy_measurement"},
+            "entropy_value": {"type": "number", "minimum": 0, "maximum": 1},
+            "entropy_type": {"type": "string", "enum": ["shannon", "hdc_vector", "class_separation"]}
+          },
+          "required": ["entropy_value", "entropy_type"]
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    {"$ref": "#/definitions/hdc_encoding_receipt"},
+    {"$ref": "#/definitions/swr_detection_receipt"},
+    {"$ref": "#/definitions/fl_update_receipt"},
+    {"$ref": "#/definitions/phase_lock_receipt"},
+    {"$ref": "#/definitions/channel_quality_receipt"},
+    {"$ref": "#/definitions/stimulation_receipt"},
+    {"$ref": "#/definitions/thermal_violation_receipt"},
+    {"$ref": "#/definitions/entropy_measurement_receipt"}
+  ]
+}
